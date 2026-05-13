@@ -109,22 +109,30 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       data: { status: "DONE" },
     });
 
-    // Check if ALL assignees have completed
+    // Fetch all assignees to check how many have now completed
     const allAssignees = await prisma.runStepAssignee.findMany({ where: { runStepId: id } });
-    const allDone = allAssignees.every((a) => a.completedAt !== null);
+    const completedAssignees = allAssignees.filter((a) => a.completedAt !== null);
+    const isFirstCompletion = completedAssignees.length === 1;
 
-    if (allDone) {
-      // Determine final status: BLOCKED wins over FAILED wins over PASSED
-      const statuses = allAssignees.map((a) => a.completedStatus as string);
-      const finalStatus: TerminalStatus = statuses.includes("BLOCKED")
-        ? "BLOCKED"
-        : statuses.includes("FAILED")
-        ? "FAILED"
-        : "PASSED";
+    if (isFirstCompletion) {
+      // First tester to complete: immediately advance the step
+      const finalStatus = parsed.data.status as TerminalStatus;
 
       await prisma.runStep.updateMany({
         where: { id, tenantId },
         data: { status: finalStatus, doneById: user.id, doneAt: new Date() },
+      });
+
+      // Close remaining open tasks for this step from other testers
+      await prisma.task.updateMany({
+        where: { runStepId: id, type: "STEP_EXECUTION", status: { not: "DONE" } },
+        data: { status: "DONE" },
+      });
+
+      // Clear any pending retests on this step (hertest is done)
+      await prisma.issue.updateMany({
+        where: { runStepId: id, retestRequired: true },
+        data: { retestRequired: false },
       });
 
       await advanceToNextStep(step.runId, step.order, tenantId);
@@ -140,6 +148,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     await prisma.runStep.updateMany({ where: { id, tenantId }, data: updateData });
 
     if (terminal) {
+      // Clear any pending retests on this step
+      await prisma.issue.updateMany({
+        where: { runStepId: id, retestRequired: true },
+        data: { retestRequired: false },
+      });
+
       await advanceToNextStep(step.runId, step.order, tenantId);
       await checkAndFinalizeRun(step.runId);
       // Close any open STEP_EXECUTION task for this user on this step

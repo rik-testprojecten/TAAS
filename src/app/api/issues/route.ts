@@ -5,7 +5,7 @@ import { requireTenantAuth } from "@/lib/api-helpers";
 export async function GET(req: NextRequest) {
   const result = await requireTenantAuth();
   if ("error" in result) return result.error;
-  const { tenantId } = result.context;
+  const { tenantId, user } = result.context;
 
   const url = new URL(req.url);
   const status = url.searchParams.get("status");
@@ -13,7 +13,12 @@ export async function GET(req: NextRequest) {
   const impact = url.searchParams.get("impact");
   const projectId = url.searchParams.get("projectId");
 
+  const isTesterOnly =
+    user.roles.includes("TESTER") &&
+    !user.roles.some((r) => ["TENANT_ADMIN", "FUNCTIONAL_MANAGER"].includes(r));
+
   const where: Record<string, unknown> = { tenantId };
+  if (isTesterOnly) where.createdById = user.id;
   if (status) where.status = status;
   if (type) where.type = type;
   if (impact) where.impact = impact;

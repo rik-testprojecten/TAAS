@@ -4,8 +4,146 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 
 type InsertPosition = { type: "before" | "after" | "end"; stepId?: string };
+type StepForm = { title: string; instruction: string; expectedResult: string; assigneeIds: string[] };
 
-const EMPTY_NEW_FORM = { title: "", instruction: "", expectedResult: "", assigneeIds: [] as string[] };
+const EMPTY_NEW_FORM: StepForm = { title: "", instruction: "", expectedResult: "", assigneeIds: [] };
+
+// ── Top-level sub-components (outside main component to prevent re-mount on state change) ──
+
+function AssigneePills({
+  users,
+  selected,
+  onToggle,
+}: {
+  users: any[];
+  selected: string[];
+  onToggle: (id: string) => void;
+}) {
+  if (users.length === 0) return null;
+  return (
+    <div>
+      <label className="block text-xs font-medium text-slate-600 mb-2">Uitvoerders</label>
+      <div className="flex flex-wrap gap-2">
+        {users.map((u: any) => {
+          const checked = selected.includes(u.id);
+          return (
+            <button
+              key={u.id}
+              type="button"
+              onClick={() => onToggle(u.id)}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs border transition-colors ${
+                checked
+                  ? "bg-primary-100 border-primary-300 text-primary-700 font-medium"
+                  : "bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50"
+              }`}
+            >
+              {checked && (
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+              {u.name}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function NewStepForm({
+  insertPos,
+  form,
+  users,
+  saving,
+  onAdd,
+  onCancel,
+  onFormChange,
+  onToggle,
+}: {
+  insertPos: InsertPosition | null;
+  form: StepForm;
+  users: any[];
+  saving: boolean;
+  onAdd: () => void;
+  onCancel: () => void;
+  onFormChange: (f: StepForm) => void;
+  onToggle: (id: string) => void;
+}) {
+  return (
+    <div className="card p-4 border-2 border-primary-300 border-dashed bg-primary-50/30">
+      <p className="text-xs font-semibold text-primary-700 mb-3">
+        {insertPos?.type === "before"
+          ? "Nieuwe stap invoegen hiervoor"
+          : insertPos?.type === "after"
+          ? "Nieuwe stap invoegen hierna"
+          : "Nieuwe stap toevoegen"}
+      </p>
+      <div className="space-y-3">
+        <input
+          className="input"
+          placeholder="Stap titel *"
+          value={form.title}
+          onChange={(e) => onFormChange({ ...form, title: e.target.value })}
+          autoFocus
+        />
+        <textarea
+          className="input resize-none"
+          rows={3}
+          placeholder="Instructie / testscript *"
+          value={form.instruction}
+          onChange={(e) => onFormChange({ ...form, instruction: e.target.value })}
+        />
+        <input
+          className="input"
+          placeholder="Verwacht resultaat (optioneel)"
+          value={form.expectedResult}
+          onChange={(e) => onFormChange({ ...form, expectedResult: e.target.value })}
+        />
+        <AssigneePills users={users} selected={form.assigneeIds} onToggle={onToggle} />
+        <div className="flex gap-2 pt-1">
+          <button
+            onClick={onAdd}
+            disabled={saving || !form.title || !form.instruction}
+            className="btn-primary text-sm"
+          >
+            {saving ? "Toevoegen..." : "Stap toevoegen"}
+          </button>
+          <button onClick={onCancel} className="btn-secondary text-sm">
+            Annuleren
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function InserterButton({
+  insertPos,
+  pos,
+  onInsert,
+}: {
+  insertPos: InsertPosition | null;
+  pos: InsertPosition;
+  onInsert: (pos: InsertPosition) => void;
+}) {
+  if (insertPos !== null) return null;
+  return (
+    <button
+      onClick={() => onInsert(pos)}
+      className="w-full flex items-center gap-2 py-1.5 px-3 text-xs text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors group"
+    >
+      <span className="w-4 h-4 rounded-full border border-slate-300 group-hover:border-primary-400 flex items-center justify-center shrink-0">
+        <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+        </svg>
+      </span>
+      Stap hier invoegen
+    </button>
+  );
+}
+
+// ── Main component ───────────────────────────────────────────────────────────
 
 export default function FlowBuilderPage() {
   const { id } = useParams<{ id: string }>();
@@ -14,7 +152,7 @@ export default function FlowBuilderPage() {
   const [editingStep, setEditingStep] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<any>({});
   const [insertPos, setInsertPos] = useState<InsertPosition | null>(null);
-  const [newStepForm, setNewStepForm] = useState(EMPTY_NEW_FORM);
+  const [newStepForm, setNewStepForm] = useState<StepForm>(EMPTY_NEW_FORM);
   const [saving, setSaving] = useState(false);
   const [tenantUsers, setTenantUsers] = useState<any[]>([]);
 
@@ -130,107 +268,6 @@ export default function FlowBuilderPage() {
   if (loading) return <div className="p-8 text-slate-500">Laden...</div>;
   if (!flow || flow.error) return <div className="p-8 text-slate-500">Flow niet gevonden</div>;
 
-  // ── Sub-components ──────────────────────────────────────────────────────────
-
-  function AssigneePills({ selected, onToggle }: { selected: string[]; onToggle: (id: string) => void }) {
-    if (tenantUsers.length === 0) return null;
-    return (
-      <div>
-        <label className="block text-xs font-medium text-slate-600 mb-2">Uitvoerders</label>
-        <div className="flex flex-wrap gap-2">
-          {tenantUsers.map((u: any) => {
-            const checked = selected.includes(u.id);
-            return (
-              <button
-                key={u.id}
-                type="button"
-                onClick={() => onToggle(u.id)}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs border transition-colors ${
-                  checked
-                    ? "bg-primary-100 border-primary-300 text-primary-700 font-medium"
-                    : "bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50"
-                }`}
-              >
-                {checked && (
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                  </svg>
-                )}
-                {u.name}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    );
-  }
-
-  function NewStepForm() {
-    return (
-      <div className="card p-4 border-2 border-primary-300 border-dashed bg-primary-50/30">
-        <p className="text-xs font-semibold text-primary-700 mb-3">
-          {insertPos?.type === "before" ? "Nieuwe stap invoegen hiervoor" :
-           insertPos?.type === "after" ? "Nieuwe stap invoegen hierna" :
-           "Nieuwe stap toevoegen"}
-        </p>
-        <div className="space-y-3">
-          <input
-            className="input"
-            placeholder="Stap titel *"
-            value={newStepForm.title}
-            onChange={(e) => setNewStepForm({ ...newStepForm, title: e.target.value })}
-            autoFocus
-          />
-          <textarea
-            className="input resize-none"
-            rows={3}
-            placeholder="Instructie / testscript *"
-            value={newStepForm.instruction}
-            onChange={(e) => setNewStepForm({ ...newStepForm, instruction: e.target.value })}
-          />
-          <input
-            className="input"
-            placeholder="Verwacht resultaat (optioneel)"
-            value={newStepForm.expectedResult}
-            onChange={(e) => setNewStepForm({ ...newStepForm, expectedResult: e.target.value })}
-          />
-          <AssigneePills selected={newStepForm.assigneeIds} onToggle={toggleInNew} />
-          <div className="flex gap-2 pt-1">
-            <button
-              onClick={addStep}
-              disabled={saving || !newStepForm.title || !newStepForm.instruction}
-              className="btn-primary text-sm"
-            >
-              {saving ? "Toevoegen..." : "Stap toevoegen"}
-            </button>
-            <button onClick={() => setInsertPos(null)} className="btn-secondary text-sm">
-              Annuleren
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  function InserterButton({ pos }: { pos: InsertPosition }) {
-    if (insertPos !== null) return null;
-    return (
-      <button
-        onClick={() => startInsert(pos)}
-        className="w-full flex items-center gap-2 py-1.5 px-3 text-xs text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors group"
-      >
-        <span className="w-4 h-4 rounded-full border border-slate-300 group-hover:border-primary-400 flex items-center justify-center shrink-0">
-          <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-          </svg>
-        </span>
-        Stap hier invoegen
-      </button>
-    );
-  }
-
-  // ── Render ──────────────────────────────────────────────────────────────────
-
   return (
     <div className="p-8">
       <div className="flex items-center gap-2 text-sm text-slate-400 mb-6">
@@ -286,8 +323,17 @@ export default function FlowBuilderPage() {
         {/* Insert BEFORE first step */}
         {!hasRuns && steps.length > 0 && (
           insertPos?.type === "before" && insertPos.stepId === steps[0]?.id
-            ? <NewStepForm />
-            : <InserterButton pos={{ type: "before", stepId: steps[0]?.id }} />
+            ? <NewStepForm
+                insertPos={insertPos}
+                form={newStepForm}
+                users={tenantUsers}
+                saving={saving}
+                onAdd={addStep}
+                onCancel={() => setInsertPos(null)}
+                onFormChange={setNewStepForm}
+                onToggle={toggleInNew}
+              />
+            : <InserterButton insertPos={insertPos} pos={{ type: "before", stepId: steps[0]?.id }} onInsert={startInsert} />
         )}
 
         {steps.map((step: any, index: number) => (
@@ -308,7 +354,7 @@ export default function FlowBuilderPage() {
                     <label className="block text-xs font-medium text-slate-600 mb-1">Verwacht resultaat</label>
                     <textarea className="input resize-none" rows={2} value={editForm.expectedResult || ""} onChange={(e) => setEditForm({ ...editForm, expectedResult: e.target.value })} />
                   </div>
-                  <AssigneePills selected={editForm.assigneeIds ?? []} onToggle={toggleInEdit} />
+                  <AssigneePills users={tenantUsers} selected={editForm.assigneeIds ?? []} onToggle={toggleInEdit} />
                   <div className="flex gap-2 pt-1">
                     <button onClick={() => saveStep(step.id)} disabled={saving} className="btn-primary text-sm">
                       {saving ? "Opslaan..." : "Opslaan"}
@@ -321,7 +367,7 @@ export default function FlowBuilderPage() {
               /* ── Step card ── */
               <div className="card">
                 <div className="flex items-start p-4 gap-3">
-                  {/* Reorder buttons — always visible when editable */}
+                  {/* Reorder buttons */}
                   {!hasRuns && (
                     <div className="flex flex-col gap-0.5 shrink-0 mt-0.5">
                       <button
@@ -403,10 +449,32 @@ export default function FlowBuilderPage() {
             {/* Insert AFTER this step / BEFORE next step */}
             {!hasRuns && (
               insertPos?.type === "after" && insertPos.stepId === step.id
-                ? <div className="mt-1"><NewStepForm /></div>
+                ? <div className="mt-1">
+                    <NewStepForm
+                      insertPos={insertPos}
+                      form={newStepForm}
+                      users={tenantUsers}
+                      saving={saving}
+                      onAdd={addStep}
+                      onCancel={() => setInsertPos(null)}
+                      onFormChange={setNewStepForm}
+                      onToggle={toggleInNew}
+                    />
+                  </div>
                 : insertPos?.type === "before" && insertPos.stepId === steps[index + 1]?.id
-                ? <div className="mt-1"><NewStepForm /></div>
-                : <InserterButton pos={{ type: "after", stepId: step.id }} />
+                ? <div className="mt-1">
+                    <NewStepForm
+                      insertPos={insertPos}
+                      form={newStepForm}
+                      users={tenantUsers}
+                      saving={saving}
+                      onAdd={addStep}
+                      onCancel={() => setInsertPos(null)}
+                      onFormChange={setNewStepForm}
+                      onToggle={toggleInNew}
+                    />
+                  </div>
+                : <InserterButton insertPos={insertPos} pos={{ type: "after", stepId: step.id }} onInsert={startInsert} />
             )}
           </div>
         ))}
@@ -414,7 +482,16 @@ export default function FlowBuilderPage() {
         {/* Add to end */}
         {!hasRuns && (
           insertPos?.type === "end"
-            ? <NewStepForm />
+            ? <NewStepForm
+                insertPos={insertPos}
+                form={newStepForm}
+                users={tenantUsers}
+                saving={saving}
+                onAdd={addStep}
+                onCancel={() => setInsertPos(null)}
+                onFormChange={setNewStepForm}
+                onToggle={toggleInNew}
+              />
             : insertPos === null && (
               <button
                 onClick={() => startInsert({ type: "end" })}

@@ -16,15 +16,6 @@ export default function TasksPage() {
     setLoading(false);
   }
 
-  async function updateTask(taskId: string, status: string) {
-    await fetch(`/api/tasks/${taskId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
-    });
-    load();
-  }
-
   const TYPE_ICONS: Record<string, string> = {
     STEP_EXECUTION: "🧪",
     RETEST: "🔄",
@@ -46,57 +37,57 @@ export default function TasksPage() {
         ) : tasks.map((task) => {
           const run = task.runStep?.run;
           const project = run?.flowVersion?.flow?.phase?.project;
-          return (
-            <div key={task.id} className="card p-4">
-              <div className="flex items-start justify-between">
+
+          // QUESTION tasks: link to the issue, not a task detail page
+          if (task.type === "QUESTION" && task.issue) {
+            return (
+              <Link key={task.id} href={`/issues/${task.issue.id}`} className="card p-4 hover:border-primary-300 transition-colors block">
                 <div className="flex items-start gap-3">
                   <span className="text-lg mt-0.5">{TYPE_ICONS[task.type]}</span>
-                  <div>
+                  <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded">{TASK_TYPE_LABELS[task.type]}</span>
                       <span className={`badge ${STATUS_COLORS[task.status]}`}>{task.status}</span>
                     </div>
                     <h3 className="font-medium text-slate-900">{task.title}</h3>
                     {task.description && <p className="text-sm text-slate-500 mt-0.5">{task.description}</p>}
-                    {project && (
-                      <div className="text-xs text-slate-400 mt-1">{project.name} — {run?.name}</div>
-                    )}
-                    {task.issue && (
-                      <Link href={`/issues/${task.issue.id}`} className="text-xs text-primary-600 hover:underline mt-1 block">
-                        Bevinding: {task.issue.title}
-                        {task.issue.impact && <span className={`ml-2 badge border text-xs ${IMPACT_COLORS[task.issue.impact]}`}>{ISSUE_IMPACT_LABELS[task.issue.impact]}</span>}
-                      </Link>
-                    )}
                     <div className="text-xs text-slate-400 mt-1">{formatDateTime(task.createdAt)}</div>
                   </div>
+                  <svg className="w-4 h-4 text-slate-300 mt-1 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
                 </div>
-                <div className="flex gap-2 ml-4">
-                  {task.type === "STEP_EXECUTION" && task.runStep && (
-                    <Link href={`/runs/${task.runStep.run?.id}`} className="btn-secondary text-xs">
-                      Naar run
-                    </Link>
+              </Link>
+            );
+          }
+
+          // STEP_EXECUTION and RETEST tasks: link to task detail page
+          return (
+            <Link key={task.id} href={`/tasks/${task.id}`} className="card p-4 hover:border-primary-300 transition-colors block">
+              <div className="flex items-start gap-3">
+                <span className="text-lg mt-0.5">{TYPE_ICONS[task.type]}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded">{TASK_TYPE_LABELS[task.type]}</span>
+                    <span className={`badge ${STATUS_COLORS[task.status]}`}>{task.status}</span>
+                  </div>
+                  <h3 className="font-medium text-slate-900">{task.title}</h3>
+                  {project && (
+                    <div className="text-xs text-slate-400 mt-1">{project.name} — {run?.name}</div>
                   )}
-                  {task.type === "RETEST" && task.runStep && (
-                    <Link href={`/runs/${task.runStep.run?.id}`} className="btn-secondary text-xs">
-                      Hertest uitvoeren
-                    </Link>
+                  {task.issue && (
+                    <div className="text-xs text-primary-600 mt-1">
+                      Bevinding: {task.issue.title}
+                      {task.issue.impact && <span className={`ml-2 badge border text-xs ${IMPACT_COLORS[task.issue.impact]}`}>{ISSUE_IMPACT_LABELS[task.issue.impact]}</span>}
+                    </div>
                   )}
-                  {task.type === "QUESTION" && task.issue && (
-                    <Link href={`/issues/${task.issue.id}`} className="btn-secondary text-xs">
-                      Bekijk bevinding
-                    </Link>
-                  )}
-                  {task.status !== "DONE" && (
-                    <button
-                      onClick={() => updateTask(task.id, "DONE")}
-                      className="text-xs text-green-700 border border-green-200 px-3 py-1.5 rounded-lg hover:bg-green-50 transition-colors"
-                    >
-                      Afronden
-                    </button>
-                  )}
+                  <div className="text-xs text-slate-400 mt-1">{formatDateTime(task.createdAt)}</div>
                 </div>
+                <svg className="w-4 h-4 text-slate-300 mt-1 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
               </div>
-            </div>
+            </Link>
           );
         })}
       </div>

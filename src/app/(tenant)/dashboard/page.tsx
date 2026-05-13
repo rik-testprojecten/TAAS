@@ -2,13 +2,105 @@ export const dynamic = "force-dynamic";
 import { auth } from "../../../../auth";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
-import { STATUS_COLORS, IMPACT_COLORS, ISSUE_TYPE_LABELS, formatDateTime } from "@/lib/utils";
+import { STATUS_COLORS, IMPACT_COLORS, ISSUE_TYPE_LABELS, ISSUE_IMPACT_LABELS, TASK_TYPE_LABELS, formatDateTime } from "@/lib/utils";
 
 export default async function DashboardPage() {
   const session = await auth();
   const tenantId = session!.user.tenantId!;
   const userId = session!.user.id;
+  const roles = session!.user.roles;
 
+  const isTesterOnly =
+    roles.includes("TESTER") &&
+    !roles.some((r) => ["TENANT_ADMIN", "FUNCTIONAL_MANAGER", "SCRIPT_WRITER"].includes(r));
+
+  // ── Tester-only view ───────────────────────────────────────────────────────
+  if (isTesterOnly) {
+    const myTasks = await prisma.task.findMany({
+      where: { tenantId, userId, status: { not: "DONE" } },
+      include: {
+        runStep: {
+          include: {
+            run: {
+              include: {
+                flowVersion: { include: { flow: { include: { phase: { include: { project: true } } } } } },
+              },
+            },
+          },
+        },
+        issue: { select: { id: true, title: true, impact: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const TYPE_ICONS: Record<string, string> = {
+      STEP_EXECUTION: "🧪",
+      RETEST: "🔄",
+      QUESTION: "❓",
+    };
+
+    return (
+      <div className="p-8 max-w-2xl">
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold text-slate-900">Welkom, {session!.user.name}</h1>
+          <p className="text-slate-500 text-sm mt-1">
+            {myTasks.length === 0
+              ? "Je hebt geen openstaande taken. Goed bezig!"
+              : `Je hebt ${myTasks.length} openstaande taak${myTasks.length !== 1 ? "en" : ""}.`}
+          </p>
+        </div>
+
+        {myTasks.length > 0 && (
+          <div>
+            <h2 className="font-semibold text-slate-700 mb-3">Mijn taken</h2>
+            <div className="space-y-3">
+              {myTasks.map((task) => {
+                const run = task.runStep?.run;
+                const project = run?.flowVersion?.flow?.phase?.project;
+
+                const href = task.type === "QUESTION" && task.issue
+                  ? `/issues/${task.issue.id}`
+                  : `/tasks/${task.id}`;
+
+                return (
+                  <Link key={task.id} href={href} className="card p-4 hover:border-primary-300 transition-colors block">
+                    <div className="flex items-start gap-3">
+                      <span className="text-lg mt-0.5">{TYPE_ICONS[task.type]}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded">{TASK_TYPE_LABELS[task.type]}</span>
+                        </div>
+                        <h3 className="font-medium text-slate-900">{task.title}</h3>
+                        {project && (
+                          <div className="text-xs text-slate-400 mt-1">{project.name} — {run?.name}</div>
+                        )}
+                        {task.issue && (
+                          <div className="text-xs text-primary-600 mt-1">
+                            Bevinding: {task.issue.title}
+                            {task.issue.impact && (
+                              <span className={`ml-2 badge border text-xs ${IMPACT_COLORS[task.issue.impact]}`}>
+                                {ISSUE_IMPACT_LABELS[task.issue.impact]}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        <div className="text-xs text-slate-400 mt-1">{formatDateTime(task.createdAt)}</div>
+                      </div>
+                      <svg className="w-4 h-4 text-slate-300 mt-1 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── Full dashboard (admin / FM / script writer) ────────────────────────────
   const [projects, openIssues, myTasks, recentRuns] = await Promise.all([
     prisma.project.findMany({
       where: { tenantId, status: "ACTIVE" },
