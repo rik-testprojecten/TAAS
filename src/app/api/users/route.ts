@@ -12,12 +12,12 @@ const createSchema = z.object({
 });
 
 export async function GET() {
-  const result = await requireTenantAuth(["TENANT_ADMIN"]);
+  const result = await requireTenantAuth(["TENANT_ADMIN", "SCRIPT_WRITER"]);
   if ("error" in result) return result.error;
   const { tenantId } = result.context;
 
   const users = await prisma.tenantUser.findMany({
-    where: { tenantId },
+    where: { tenantId, isActive: true },
     select: { id: true, name: true, email: true, roles: true, isActive: true, createdAt: true },
     orderBy: { name: "asc" },
   });

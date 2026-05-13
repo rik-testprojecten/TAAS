@@ -8,6 +8,7 @@ const updateSchema = z.object({
   instruction: z.string().min(1).optional(),
   expectedResult: z.string().optional(),
   isArchived: z.boolean().optional(),
+  assigneeIds: z.array(z.string()).optional(),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -26,7 +27,26 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const parsed = updateSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
-  const updated = await prisma.flowStep.update({ where: { id }, data: parsed.data });
+  const { assigneeIds, ...stepData } = parsed.data;
+
+  if (Object.keys(stepData).length > 0) {
+    await prisma.flowStep.update({ where: { id }, data: stepData });
+  }
+
+  if (assigneeIds !== undefined) {
+    await prisma.flowStepAssignee.deleteMany({ where: { flowStepId: id } });
+    if (assigneeIds.length > 0) {
+      await prisma.flowStepAssignee.createMany({
+        data: assigneeIds.map((userId) => ({ flowStepId: id, userId, tenantId })),
+        skipDuplicates: true,
+      });
+    }
+  }
+
+  const updated = await prisma.flowStep.findFirst({
+    where: { id },
+    include: { assignees: { include: { user: { select: { id: true, name: true } } } } },
+  });
   return NextResponse.json(updated);
 }
 

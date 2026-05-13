@@ -31,7 +31,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const version = await prisma.flowVersion.findFirst({
     where: { id, tenantId },
     include: {
-      steps: { where: { isArchived: false }, orderBy: { order: "asc" } },
+      steps: {
+        where: { isArchived: false },
+        orderBy: { order: "asc" },
+        include: { assignees: true },
+      },
       flow: { include: { phase: true } },
     },
   });
@@ -61,5 +65,22 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     },
     include: { steps: { orderBy: { order: "asc" } } },
   });
+
+  // Copy FlowStepAssignees → RunStepAssignees
+  const runStepByOrder = new Map(run.steps.map((rs) => [rs.order, rs.id]));
+  for (const flowStep of version.steps) {
+    if (flowStep.assignees.length === 0) continue;
+    const runStepId = runStepByOrder.get(flowStep.order);
+    if (!runStepId) continue;
+    await prisma.runStepAssignee.createMany({
+      data: flowStep.assignees.map((a) => ({
+        runStepId,
+        userId: a.userId,
+        tenantId,
+      })),
+      skipDuplicates: true,
+    });
+  }
+
   return NextResponse.json(run, { status: 201 });
 }

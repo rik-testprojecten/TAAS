@@ -280,10 +280,12 @@ enum StepStatus {
 }
 
 model RunStepAssignee {
-  id        String @id @default(cuid())
-  runStepId String
-  userId    String
-  tenantId  String
+  id              String     @id @default(cuid())
+  runStepId       String
+  userId          String
+  tenantId        String
+  completedAt     DateTime?
+  completedStatus StepStatus?
 
   runStep RunStep    @relation(fields: [runStepId], references: [id], onDelete: Cascade)
   user    TenantUser @relation(fields: [userId], references: [id], onDelete: Cascade)

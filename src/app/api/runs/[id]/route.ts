@@ -15,7 +15,9 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
       steps: {
         orderBy: { order: "asc" },
         include: {
-          assignees: { include: { user: { select: { id: true, name: true } } } },
+          assignees: {
+            include: { user: { select: { id: true, name: true } } },
+          },
           issues: {
             include: {
               createdBy: { select: { id: true, name: true } },
@@ -50,5 +52,34 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   await prisma.testRun.updateMany({ where: { id, tenantId }, data: updateData });
+
+  // When run starts, create STEP_EXECUTION tasks for first step's assignees
+  if (body.status === "IN_PROGRESS") {
+    const firstStep = await prisma.runStep.findFirst({
+      where: { runId: id, tenantId },
+      include: { assignees: true },
+      orderBy: { order: "asc" },
+    });
+    if (firstStep && firstStep.assignees.length > 0) {
+      for (const assignee of firstStep.assignees) {
+        const existing = await prisma.task.findFirst({
+          where: { runStepId: firstStep.id, userId: assignee.userId, type: "STEP_EXECUTION", status: { not: "DONE" } },
+        });
+        if (!existing) {
+          await prisma.task.create({
+            data: {
+              tenantId,
+              userId: assignee.userId,
+              type: "STEP_EXECUTION",
+              title: `Voer stap uit: ${firstStep.title}`,
+              runStepId: firstStep.id,
+              status: "OPEN",
+            },
+          });
+        }
+      }
+    }
+  }
+
   return NextResponse.json({ success: true });
 }

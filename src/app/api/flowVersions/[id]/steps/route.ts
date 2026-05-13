@@ -9,6 +9,8 @@ const createSchema = z.object({
   expectedResult: z.string().optional(),
   order: z.number().optional(),
   afterStepId: z.string().optional(),
+  beforeStepId: z.string().optional(),
+  assigneeIds: z.array(z.string()).optional(),
 });
 
 export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -41,22 +43,46 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const parsed = createSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
-  const maxOrder = await prisma.flowStep.aggregate({ where: { flowVersionId: id }, _max: { order: true } });
-  const order = parsed.data.order ?? (maxOrder._max.order ?? 0) + 1;
+  let insertOrder: number;
 
-  // If inserting after a step, shift others
   if (parsed.data.afterStepId) {
     const afterStep = await prisma.flowStep.findUnique({ where: { id: parsed.data.afterStepId } });
-    if (afterStep) {
-      await prisma.flowStep.updateMany({
-        where: { flowVersionId: id, order: { gt: afterStep.order } },
-        data: { order: { increment: 1 } },
-      });
-    }
+    if (!afterStep) return NextResponse.json({ error: "afterStepId not found" }, { status: 404 });
+    await prisma.flowStep.updateMany({
+      where: { flowVersionId: id, order: { gt: afterStep.order } },
+      data: { order: { increment: 1 } },
+    });
+    insertOrder = afterStep.order + 1;
+  } else if (parsed.data.beforeStepId) {
+    const beforeStep = await prisma.flowStep.findUnique({ where: { id: parsed.data.beforeStepId } });
+    if (!beforeStep) return NextResponse.json({ error: "beforeStepId not found" }, { status: 404 });
+    await prisma.flowStep.updateMany({
+      where: { flowVersionId: id, order: { gte: beforeStep.order } },
+      data: { order: { increment: 1 } },
+    });
+    insertOrder = beforeStep.order;
+  } else {
+    const maxOrder = await prisma.flowStep.aggregate({ where: { flowVersionId: id }, _max: { order: true } });
+    insertOrder = parsed.data.order ?? (maxOrder._max.order ?? 0) + 1;
   }
 
   const step = await prisma.flowStep.create({
-    data: { flowVersionId: id, tenantId, title: parsed.data.title, instruction: parsed.data.instruction, expectedResult: parsed.data.expectedResult, order },
+    data: {
+      flowVersionId: id,
+      tenantId,
+      title: parsed.data.title,
+      instruction: parsed.data.instruction,
+      expectedResult: parsed.data.expectedResult,
+      order: insertOrder,
+    },
   });
+
+  if (parsed.data.assigneeIds && parsed.data.assigneeIds.length > 0) {
+    await prisma.flowStepAssignee.createMany({
+      data: parsed.data.assigneeIds.map((userId) => ({ flowStepId: step.id, userId, tenantId })),
+      skipDuplicates: true,
+    });
+  }
+
   return NextResponse.json(step, { status: 201 });
 }

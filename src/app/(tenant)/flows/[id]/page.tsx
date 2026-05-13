@@ -3,17 +3,29 @@ import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 
+type InsertPosition = { type: "before" | "after" | "end"; stepId?: string };
+
+const EMPTY_NEW_FORM = { title: "", instruction: "", expectedResult: "", assigneeIds: [] as string[] };
+
 export default function FlowBuilderPage() {
   const { id } = useParams<{ id: string }>();
   const [flow, setFlow] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [editingStep, setEditingStep] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<any>({});
-  const [newStep, setNewStep] = useState<{ afterStepId?: string; active: boolean }>({ active: false });
-  const [newStepForm, setNewStepForm] = useState({ title: "", instruction: "", expectedResult: "" });
+  const [insertPos, setInsertPos] = useState<InsertPosition | null>(null);
+  const [newStepForm, setNewStepForm] = useState(EMPTY_NEW_FORM);
   const [saving, setSaving] = useState(false);
+  const [tenantUsers, setTenantUsers] = useState<any[]>([]);
 
   useEffect(() => { load(); }, [id]);
+
+  useEffect(() => {
+    fetch("/api/users")
+      .then((r) => r.json())
+      .then((data) => { if (Array.isArray(data)) setTenantUsers(data); })
+      .catch(() => {});
+  }, []);
 
   async function load() {
     const res = await fetch(`/api/flows/${id}`);
@@ -23,7 +35,7 @@ export default function FlowBuilderPage() {
   }
 
   const activeVersion = flow?.versions?.find((v: any) => v.isActive) ?? flow?.versions?.[0];
-  const steps = activeVersion?.steps ?? [];
+  const steps = (activeVersion?.steps ?? []) as any[];
   const hasRuns = (activeVersion?._count?.runs ?? 0) > 0;
 
   async function saveStep(stepId: string) {
@@ -34,7 +46,7 @@ export default function FlowBuilderPage() {
       body: JSON.stringify(editForm),
     });
     setEditingStep(null);
-    load();
+    await load();
     setSaving(false);
   }
 
@@ -44,17 +56,42 @@ export default function FlowBuilderPage() {
     load();
   }
 
-  async function addStep(afterStepId?: string) {
+  async function addStep() {
+    if (!newStepForm.title || !newStepForm.instruction) return;
     setSaving(true);
+    const body: Record<string, unknown> = {
+      title: newStepForm.title,
+      instruction: newStepForm.instruction,
+      expectedResult: newStepForm.expectedResult,
+      assigneeIds: newStepForm.assigneeIds,
+    };
+    if (insertPos?.type === "after" && insertPos.stepId) body.afterStepId = insertPos.stepId;
+    if (insertPos?.type === "before" && insertPos.stepId) body.beforeStepId = insertPos.stepId;
     await fetch(`/api/flowVersions/${activeVersion.id}/steps`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...newStepForm, afterStepId }),
+      body: JSON.stringify(body),
     });
-    setNewStep({ active: false });
-    setNewStepForm({ title: "", instruction: "", expectedResult: "" });
-    load();
+    setInsertPos(null);
+    setNewStepForm(EMPTY_NEW_FORM);
+    await load();
     setSaving(false);
+  }
+
+  async function moveStep(stepId: string, direction: "up" | "down") {
+    const ids: string[] = steps.map((s: any) => s.id);
+    const idx = ids.indexOf(stepId);
+    if (direction === "up" && idx > 0) {
+      [ids[idx], ids[idx - 1]] = [ids[idx - 1], ids[idx]];
+    } else if (direction === "down" && idx < ids.length - 1) {
+      [ids[idx], ids[idx + 1]] = [ids[idx + 1], ids[idx]];
+    } else return;
+    await fetch(`/api/flowVersions/${activeVersion.id}/steps/reorder`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orderedIds: ids }),
+    });
+    load();
   }
 
   async function createNewVersion() {
@@ -63,8 +100,136 @@ export default function FlowBuilderPage() {
     load();
   }
 
+  function startInsert(pos: InsertPosition) {
+    setInsertPos(pos);
+    setNewStepForm(EMPTY_NEW_FORM);
+    setEditingStep(null);
+  }
+
+  function startEdit(step: any) {
+    setEditingStep(step.id);
+    setInsertPos(null);
+    setEditForm({
+      title: step.title,
+      instruction: step.instruction,
+      expectedResult: step.expectedResult ?? "",
+      assigneeIds: step.assignees?.map((a: any) => a.userId) ?? [],
+    });
+  }
+
+  function toggleInEdit(userId: string) {
+    const cur: string[] = editForm.assigneeIds ?? [];
+    setEditForm({ ...editForm, assigneeIds: cur.includes(userId) ? cur.filter((x: string) => x !== userId) : [...cur, userId] });
+  }
+
+  function toggleInNew(userId: string) {
+    const cur = newStepForm.assigneeIds;
+    setNewStepForm({ ...newStepForm, assigneeIds: cur.includes(userId) ? cur.filter((x) => x !== userId) : [...cur, userId] });
+  }
+
   if (loading) return <div className="p-8 text-slate-500">Laden...</div>;
   if (!flow || flow.error) return <div className="p-8 text-slate-500">Flow niet gevonden</div>;
+
+  // ── Sub-components ──────────────────────────────────────────────────────────
+
+  function AssigneePills({ selected, onToggle }: { selected: string[]; onToggle: (id: string) => void }) {
+    if (tenantUsers.length === 0) return null;
+    return (
+      <div>
+        <label className="block text-xs font-medium text-slate-600 mb-2">Uitvoerders</label>
+        <div className="flex flex-wrap gap-2">
+          {tenantUsers.map((u: any) => {
+            const checked = selected.includes(u.id);
+            return (
+              <button
+                key={u.id}
+                type="button"
+                onClick={() => onToggle(u.id)}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs border transition-colors ${
+                  checked
+                    ? "bg-primary-100 border-primary-300 text-primary-700 font-medium"
+                    : "bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50"
+                }`}
+              >
+                {checked && (
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                  </svg>
+                )}
+                {u.name}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  function NewStepForm() {
+    return (
+      <div className="card p-4 border-2 border-primary-300 border-dashed bg-primary-50/30">
+        <p className="text-xs font-semibold text-primary-700 mb-3">
+          {insertPos?.type === "before" ? "Nieuwe stap invoegen hiervoor" :
+           insertPos?.type === "after" ? "Nieuwe stap invoegen hierna" :
+           "Nieuwe stap toevoegen"}
+        </p>
+        <div className="space-y-3">
+          <input
+            className="input"
+            placeholder="Stap titel *"
+            value={newStepForm.title}
+            onChange={(e) => setNewStepForm({ ...newStepForm, title: e.target.value })}
+            autoFocus
+          />
+          <textarea
+            className="input resize-none"
+            rows={3}
+            placeholder="Instructie / testscript *"
+            value={newStepForm.instruction}
+            onChange={(e) => setNewStepForm({ ...newStepForm, instruction: e.target.value })}
+          />
+          <input
+            className="input"
+            placeholder="Verwacht resultaat (optioneel)"
+            value={newStepForm.expectedResult}
+            onChange={(e) => setNewStepForm({ ...newStepForm, expectedResult: e.target.value })}
+          />
+          <AssigneePills selected={newStepForm.assigneeIds} onToggle={toggleInNew} />
+          <div className="flex gap-2 pt-1">
+            <button
+              onClick={addStep}
+              disabled={saving || !newStepForm.title || !newStepForm.instruction}
+              className="btn-primary text-sm"
+            >
+              {saving ? "Toevoegen..." : "Stap toevoegen"}
+            </button>
+            <button onClick={() => setInsertPos(null)} className="btn-secondary text-sm">
+              Annuleren
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function InserterButton({ pos }: { pos: InsertPosition }) {
+    if (insertPos !== null) return null;
+    return (
+      <button
+        onClick={() => startInsert(pos)}
+        className="w-full flex items-center gap-2 py-1.5 px-3 text-xs text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors group"
+      >
+        <span className="w-4 h-4 rounded-full border border-slate-300 group-hover:border-primary-400 flex items-center justify-center shrink-0">
+          <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+          </svg>
+        </span>
+        Stap hier invoegen
+      </button>
+    );
+  }
+
+  // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
     <div className="p-8">
@@ -82,21 +247,23 @@ export default function FlowBuilderPage() {
         <div>
           <div className="flex items-center gap-3 mb-1">
             <h1 className="text-2xl font-bold text-slate-900">{flow.name}</h1>
-            {activeVersion && <span className="text-sm text-slate-400 bg-slate-100 px-2 py-1 rounded">{activeVersion.version}</span>}
+            {activeVersion && (
+              <span className="text-sm text-slate-400 bg-slate-100 px-2 py-1 rounded">{activeVersion.version}</span>
+            )}
           </div>
           {flow.description && <p className="text-slate-500 text-sm">{flow.description}</p>}
           {hasRuns && (
             <div className="flex items-center gap-2 mt-2 text-sm text-amber-600 bg-amber-50 px-3 py-1.5 rounded-lg">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
               Er zijn runs op deze versie — stappen zijn alleen-lezen. Maak een nieuwe versie om te bewerken.
             </div>
           )}
         </div>
         <div className="flex gap-2">
           {hasRuns && (
-            <button onClick={createNewVersion} className="btn-secondary text-sm">
-              Nieuwe versie
-            </button>
+            <button onClick={createNewVersion} className="btn-secondary text-sm">Nieuwe versie</button>
           )}
           {activeVersion && (
             <Link
@@ -109,130 +276,156 @@ export default function FlowBuilderPage() {
         </div>
       </div>
 
-      {/* Steps */}
-      <div className="space-y-3 max-w-3xl">
-        {steps.length === 0 ? (
+      {/* Steps list */}
+      <div className="max-w-3xl space-y-1">
+
+        {steps.length === 0 && !insertPos && (
           <div className="card p-8 text-center text-slate-400 text-sm">Nog geen stappen. Voeg de eerste stap toe.</div>
-        ) : steps.map((step: any, index: number) => (
+        )}
+
+        {/* Insert BEFORE first step */}
+        {!hasRuns && steps.length > 0 && (
+          insertPos?.type === "before" && insertPos.stepId === steps[0]?.id
+            ? <NewStepForm />
+            : <InserterButton pos={{ type: "before", stepId: steps[0]?.id }} />
+        )}
+
+        {steps.map((step: any, index: number) => (
           <div key={step.id}>
             {editingStep === step.id ? (
-              <div className="card p-4 border-primary-300 border-2">
+              /* ── Edit form ── */
+              <div className="card p-5 border-2 border-primary-300">
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-xs font-medium mb-1">Titel</label>
-                    <input className="input" value={editForm.title} onChange={e => setEditForm({...editForm, title: e.target.value})} />
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Titel</label>
+                    <input className="input" value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium mb-1">Instructie / Testscript</label>
-                    <textarea className="input resize-none" rows={4} value={editForm.instruction} onChange={e => setEditForm({...editForm, instruction: e.target.value})} />
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Instructie / Testscript</label>
+                    <textarea className="input resize-none" rows={4} value={editForm.instruction} onChange={(e) => setEditForm({ ...editForm, instruction: e.target.value })} />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium mb-1">Verwacht resultaat</label>
-                    <textarea className="input resize-none" rows={2} value={editForm.expectedResult || ""} onChange={e => setEditForm({...editForm, expectedResult: e.target.value})} />
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Verwacht resultaat</label>
+                    <textarea className="input resize-none" rows={2} value={editForm.expectedResult || ""} onChange={(e) => setEditForm({ ...editForm, expectedResult: e.target.value })} />
                   </div>
-                  <div className="flex gap-2">
-                    <button onClick={() => saveStep(step.id)} disabled={saving} className="btn-primary text-sm">{saving ? "Opslaan..." : "Opslaan"}</button>
+                  <AssigneePills selected={editForm.assigneeIds ?? []} onToggle={toggleInEdit} />
+                  <div className="flex gap-2 pt-1">
+                    <button onClick={() => saveStep(step.id)} disabled={saving} className="btn-primary text-sm">
+                      {saving ? "Opslaan..." : "Opslaan"}
+                    </button>
                     <button onClick={() => setEditingStep(null)} className="btn-secondary text-sm">Annuleren</button>
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="card group">
-                <div className="flex items-start p-4 gap-4">
-                  <div className="w-8 h-8 rounded-full bg-primary-100 text-primary-700 font-bold text-sm flex items-center justify-center shrink-0">
+              /* ── Step card ── */
+              <div className="card">
+                <div className="flex items-start p-4 gap-3">
+                  {/* Reorder buttons — always visible when editable */}
+                  {!hasRuns && (
+                    <div className="flex flex-col gap-0.5 shrink-0 mt-0.5">
+                      <button
+                        onClick={() => moveStep(step.id, "up")}
+                        disabled={index === 0}
+                        title="Omhoog"
+                        className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 disabled:opacity-20 disabled:cursor-not-allowed"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => moveStep(step.id, "down")}
+                        disabled={index === steps.length - 1}
+                        title="Omlaag"
+                        className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 disabled:opacity-20 disabled:cursor-not-allowed"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Step number */}
+                  <div className="w-7 h-7 rounded-full bg-primary-100 text-primary-700 font-bold text-sm flex items-center justify-center shrink-0">
                     {index + 1}
                   </div>
+
+                  {/* Content */}
                   <div className="flex-1 min-w-0">
-                    <h4 className="font-medium text-slate-900">{step.title}</h4>
-                    <p className="text-sm text-slate-600 mt-1 whitespace-pre-wrap">{step.instruction}</p>
+                    <h4 className="font-semibold text-slate-900">{step.title}</h4>
+                    <p className="text-sm text-slate-600 mt-0.5 whitespace-pre-wrap">{step.instruction}</p>
                     {step.expectedResult && (
-                      <div className="mt-2 text-sm">
-                        <span className="font-medium text-slate-500">Verwacht: </span>
+                      <div className="mt-1.5 text-sm">
+                        <span className="font-medium text-slate-400">Verwacht: </span>
                         <span className="text-slate-600">{step.expectedResult}</span>
                       </div>
                     )}
                     {step.assignees?.length > 0 && (
-                      <div className="flex gap-1 mt-2">
+                      <div className="flex flex-wrap gap-1 mt-2">
                         {step.assignees.map((a: any) => (
-                          <span key={a.id} className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded">{a.user.name}</span>
+                          <span key={a.id} className="text-xs bg-primary-50 text-primary-700 px-2 py-0.5 rounded-full border border-primary-200">
+                            {a.user.name}
+                          </span>
                         ))}
                       </div>
                     )}
                   </div>
+
+                  {/* Edit / Delete */}
                   {!hasRuns && (
-                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex gap-1 shrink-0">
                       <button
-                        onClick={() => { setEditingStep(step.id); setEditForm({ title: step.title, instruction: step.instruction, expectedResult: step.expectedResult }); }}
-                        className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded"
+                        onClick={() => startEdit(step)}
                         title="Bewerken"
+                        className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded"
                       >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
                       </button>
                       <button
                         onClick={() => deleteStep(step.id)}
-                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded"
                         title="Verwijderen"
+                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded"
                       >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
                       </button>
                     </div>
                   )}
                 </div>
-                {/* Insert step after button */}
-                {!hasRuns && (
-                  <div className="border-t border-slate-50 px-4 py-2">
-                    <button
-                      onClick={() => { setNewStep({ afterStepId: step.id, active: true }); setNewStepForm({ title: "", instruction: "", expectedResult: "" }); }}
-                      className="text-xs text-slate-400 hover:text-primary-600 flex items-center gap-1"
-                    >
-                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-                      Stap hierna invoegen
-                    </button>
-                  </div>
-                )}
               </div>
             )}
 
-            {/* Inline new step form */}
-            {newStep.active && newStep.afterStepId === step.id && (
-              <div className="card p-4 border-dashed border-2 border-primary-300 mt-3">
-                <div className="space-y-3">
-                  <input className="input" placeholder="Stap titel *" value={newStepForm.title} onChange={e => setNewStepForm({...newStepForm, title: e.target.value})} autoFocus />
-                  <textarea className="input resize-none" rows={3} placeholder="Instructie / testscript *" value={newStepForm.instruction} onChange={e => setNewStepForm({...newStepForm, instruction: e.target.value})} />
-                  <input className="input" placeholder="Verwacht resultaat" value={newStepForm.expectedResult} onChange={e => setNewStepForm({...newStepForm, expectedResult: e.target.value})} />
-                  <div className="flex gap-2">
-                    <button onClick={() => addStep(step.id)} disabled={saving || !newStepForm.title || !newStepForm.instruction} className="btn-primary text-sm">{saving ? "Toevoegen..." : "Toevoegen"}</button>
-                    <button onClick={() => setNewStep({ active: false })} className="btn-secondary text-sm">Annuleren</button>
-                  </div>
-                </div>
-              </div>
+            {/* Insert AFTER this step / BEFORE next step */}
+            {!hasRuns && (
+              insertPos?.type === "after" && insertPos.stepId === step.id
+                ? <div className="mt-1"><NewStepForm /></div>
+                : insertPos?.type === "before" && insertPos.stepId === steps[index + 1]?.id
+                ? <div className="mt-1"><NewStepForm /></div>
+                : <InserterButton pos={{ type: "after", stepId: step.id }} />
             )}
           </div>
         ))}
 
-        {/* Add first / last step */}
-        {!hasRuns && !newStep.active && (
-          <button
-            onClick={() => { setNewStep({ active: true }); setNewStepForm({ title: "", instruction: "", expectedResult: "" }); }}
-            className="w-full card p-3 text-sm text-slate-400 hover:text-primary-600 hover:border-primary-300 transition-colors flex items-center justify-center gap-2 border-dashed"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-            {steps.length === 0 ? "Eerste stap toevoegen" : "Stap aan het einde toevoegen"}
-          </button>
-        )}
-
-        {newStep.active && !newStep.afterStepId && (
-          <div className="card p-4 border-dashed border-2 border-primary-300">
-            <div className="space-y-3">
-              <input className="input" placeholder="Stap titel *" value={newStepForm.title} onChange={e => setNewStepForm({...newStepForm, title: e.target.value})} autoFocus />
-              <textarea className="input resize-none" rows={3} placeholder="Instructie / testscript *" value={newStepForm.instruction} onChange={e => setNewStepForm({...newStepForm, instruction: e.target.value})} />
-              <input className="input" placeholder="Verwacht resultaat" value={newStepForm.expectedResult} onChange={e => setNewStepForm({...newStepForm, expectedResult: e.target.value})} />
-              <div className="flex gap-2">
-                <button onClick={() => addStep()} disabled={saving || !newStepForm.title || !newStepForm.instruction} className="btn-primary text-sm">{saving ? "Toevoegen..." : "Toevoegen"}</button>
-                <button onClick={() => setNewStep({ active: false })} className="btn-secondary text-sm">Annuleren</button>
-              </div>
-            </div>
-          </div>
+        {/* Add to end */}
+        {!hasRuns && (
+          insertPos?.type === "end"
+            ? <NewStepForm />
+            : insertPos === null && (
+              <button
+                onClick={() => startInsert({ type: "end" })}
+                className="w-full card p-3 mt-1 text-sm text-slate-400 hover:text-primary-600 hover:border-primary-300 transition-colors flex items-center justify-center gap-2 border-dashed"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                {steps.length === 0 ? "Eerste stap toevoegen" : "Stap aan het einde toevoegen"}
+              </button>
+            )
         )}
       </div>
     </div>
