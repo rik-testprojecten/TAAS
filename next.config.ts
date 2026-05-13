@@ -1,9 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  experimental: {
-    serverComponentsExternalPackages: ["@prisma/client", "@react-pdf/renderer"],
-  },
+  serverExternalPackages: ["@prisma/client", "@react-pdf/renderer"],
   eslint: {
     ignoreDuringBuilds: true,
   },
