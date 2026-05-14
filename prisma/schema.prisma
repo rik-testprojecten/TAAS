@@ -143,6 +143,7 @@ model TestPhase {
   projectId String
   tenantId  String
   name      PhaseType
+  title     String?
   order     Int         @default(0)
   status    PhaseStatus @default(DRAFT)
   createdAt DateTime    @default(now())

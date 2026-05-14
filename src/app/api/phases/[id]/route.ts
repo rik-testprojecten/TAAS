@@ -14,7 +14,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
       project: {
         include: {
           phases: {
-            select: { id: true, name: true, status: true },
+            select: { id: true, name: true, title: true, status: true },
             orderBy: { order: "asc" },
           },
         },

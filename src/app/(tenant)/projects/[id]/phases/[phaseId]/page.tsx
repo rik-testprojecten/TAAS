@@ -143,16 +143,20 @@ export default function PhasePage() {
         <span>/</span>
         <Link href={`/projects/${id}`} className="hover:text-slate-600">{phase.project.name}</Link>
         <span>/</span>
-        <span className="text-slate-700">{phase.name}</span>
+        <span className="text-slate-700">{phase.title ? `${phase.name} — ${phase.title}` : phase.name}</span>
       </div>
 
       <div className="flex items-start justify-between mb-8">
         <div>
           <div className="flex items-center gap-3 mb-1">
-            <h1 className="text-2xl font-bold text-slate-900">{phase.name}</h1>
-            <span className={`badge ${STATUS_COLORS[phase.status]}`}>{phase.status}</span>
+            <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center shrink-0">
+              <span className="text-primary-700 font-bold text-sm">{phase.name}</span>
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">{PHASE_DESCRIPTIONS[phase.name]}{phase.title ? ` — ${phase.title}` : ""}</h1>
+              <span className={`badge ${STATUS_COLORS[phase.status]}`}>{phase.status}</span>
+            </div>
           </div>
-          <p className="text-slate-500 text-sm">{PHASE_DESCRIPTIONS[phase.name]}</p>
         </div>
         <div className="flex gap-2 flex-wrap justify-end">
           {isGAT && hasFATPhase && (

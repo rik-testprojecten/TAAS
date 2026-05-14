@@ -5,6 +5,7 @@ import { z } from "zod";
 
 const createSchema = z.object({
   name: z.enum(["FAT", "GAT", "PAT"]),
+  title: z.string().optional(),
   order: z.number().default(0),
 });
 
@@ -44,14 +45,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const body = await req.json();
   const parsed = createSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
-
-  // Bij GAT automatisch ook FAT aanmaken als die er nog niet is
-  if (parsed.data.name === "GAT") {
-    const existingFAT = await prisma.testPhase.findFirst({ where: { projectId: id, tenantId, name: "FAT" } });
-    if (!existingFAT) {
-      await prisma.testPhase.create({ data: { name: "FAT", order: 0, projectId: id, tenantId } });
-    }
-  }
 
   const phase = await prisma.testPhase.create({
     data: { ...parsed.data, projectId: id, tenantId },
