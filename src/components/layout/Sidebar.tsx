@@ -16,7 +16,7 @@ function NavLink({ item }: { item: NavItem }) {
         "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors",
         active
           ? "bg-primary-600 text-white"
-          : "text-slate-300 hover:bg-slate-700 hover:text-white"
+          : "text-slate-300 hover:bg-forest-600 hover:text-white"
       )}
     >
       <span className="shrink-0">{item.icon}</span>
@@ -85,9 +85,9 @@ export function TenantSidebar({
   ];
 
   return (
-    <aside className="fixed left-0 top-0 h-full w-60 bg-slate-800 flex flex-col z-10">
+    <aside className="fixed left-0 top-0 h-full w-60 bg-forest-700 flex flex-col z-10">
       {/* Logo */}
-      <div className="px-4 py-5 border-b border-slate-700">
+      <div className="px-4 py-5 border-b border-forest-900">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
             <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -96,7 +96,7 @@ export function TenantSidebar({
           </div>
           <div>
             <div className="text-white font-bold text-sm">TAAS</div>
-            {tenantName && <div className="text-slate-400 text-xs truncate max-w-[160px]">{tenantName}</div>}
+            {tenantName && <div className="text-forest-300 text-xs truncate max-w-[160px]">{tenantName}</div>}
           </div>
         </div>
       </div>
@@ -108,7 +108,7 @@ export function TenantSidebar({
         {(isAdmin || isScriptWriter) && (
           <>
             <div className="pt-4 pb-1 px-3">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Testbeheer</span>
+              <span className="text-xs font-semibold text-forest-400 uppercase tracking-wider">Testbeheer</span>
             </div>
             {projectItems.map((item) => <NavLink key={item.href} item={item} />)}
           </>
@@ -117,7 +117,7 @@ export function TenantSidebar({
         {(isAdmin || isFM || isTester) && (
           <>
             <div className="pt-4 pb-1 px-3">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Kwaliteit</span>
+              <span className="text-xs font-semibold text-forest-400 uppercase tracking-wider">Kwaliteit</span>
             </div>
             {issueItems.map((item) => <NavLink key={item.href} item={item} />)}
           </>
@@ -132,7 +132,7 @@ export function TenantSidebar({
         {isAdmin && (
           <>
             <div className="pt-4 pb-1 px-3">
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Beheer</span>
+              <span className="text-xs font-semibold text-forest-400 uppercase tracking-wider">Beheer</span>
             </div>
             {adminItems.map((item) => <NavLink key={item.href} item={item} />)}
           </>
@@ -140,19 +140,19 @@ export function TenantSidebar({
       </nav>
 
       {/* User footer */}
-      <div className="px-3 py-4 border-t border-slate-700">
+      <div className="px-3 py-4 border-t border-forest-900">
         <div className="flex items-center gap-3 px-3 py-2 mb-2">
           <div className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center text-white text-sm font-medium shrink-0">
             {userName.charAt(0).toUpperCase()}
           </div>
           <div className="min-w-0">
             <div className="text-white text-sm font-medium truncate">{userName}</div>
-            <div className="text-slate-400 text-xs">{roles[0]?.replace("_", " ")}</div>
+            <div className="text-forest-300 text-xs">{roles[0]?.replace("_", " ")}</div>
           </div>
         </div>
         <button
           onClick={() => signOut({ callbackUrl: "/login" })}
-          className="w-full flex items-center gap-3 px-3 py-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg text-sm transition-colors"
+          className="w-full flex items-center gap-3 px-3 py-2 text-slate-400 hover:text-white hover:bg-forest-600 rounded-lg text-sm transition-colors"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -184,8 +184,8 @@ export function PlatformSidebar({ userName }: { userName: string }) {
   ];
 
   return (
-    <aside className="fixed left-0 top-0 h-full w-60 bg-slate-900 flex flex-col z-10">
-      <div className="px-4 py-5 border-b border-slate-700">
+    <aside className="fixed left-0 top-0 h-full w-60 bg-forest-800 flex flex-col z-10">
+      <div className="px-4 py-5 border-b border-forest-900">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
             <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -194,14 +194,14 @@ export function PlatformSidebar({ userName }: { userName: string }) {
           </div>
           <div>
             <div className="text-white font-bold text-sm">TAAS Platform</div>
-            <div className="text-slate-400 text-xs">Rhoost Admin</div>
+            <div className="text-forest-300 text-xs">Rhoost Admin</div>
           </div>
         </div>
       </div>
       <nav className="flex-1 px-3 py-4 space-y-1">
         {platformItems.map((item) => <NavLink key={item.href} item={item} />)}
       </nav>
-      <div className="px-3 py-4 border-t border-slate-700">
+      <div className="px-3 py-4 border-t border-forest-900">
         <div className="flex items-center gap-3 px-3 py-2 mb-2">
           <div className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center text-white text-sm font-medium">
             {userName.charAt(0).toUpperCase()}
@@ -210,7 +210,7 @@ export function PlatformSidebar({ userName }: { userName: string }) {
         </div>
         <button
           onClick={() => signOut({ callbackUrl: "/login" })}
-          className="w-full flex items-center gap-3 px-3 py-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg text-sm transition-colors"
+          className="w-full flex items-center gap-3 px-3 py-2 text-slate-400 hover:text-white hover:bg-forest-700 rounded-lg text-sm transition-colors"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
