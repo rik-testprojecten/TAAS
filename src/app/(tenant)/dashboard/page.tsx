@@ -159,10 +159,10 @@ export default async function DashboardPage() {
   const totalStaleTasks = userTaskGroups.reduce((s, g) => s + g.staleCount, 0);
 
   const stats = [
-    { label: "Actieve projecten", value: projects.length, color: "text-primary-600", bg: "bg-primary-50" },
-    { label: "Open bevindingen", value: openIssues, color: "text-orange-600", bg: "bg-orange-50" },
-    { label: "Kritieke issues", value: criticalIssues, color: "text-red-600", bg: "bg-red-50" },
-    { label: "Uitstaande taken", value: totalOpenTasks, color: "text-emerald-600", bg: "bg-emerald-50" },
+    { label: "Actieve projecten", value: projects.length, color: "text-primary-600", bg: "bg-primary-50", href: "/projects" },
+    { label: "Open bevindingen", value: openIssues, color: "text-orange-600", bg: "bg-orange-50", href: "/issues" },
+    { label: "Kritieke issues", value: criticalIssues, color: "text-red-600", bg: "bg-red-50", href: "/issues?impact=CRITICAL" },
+    { label: "Uitstaande taken", value: totalOpenTasks, color: "text-emerald-600", bg: "bg-emerald-50", href: "/tasks" },
   ];
 
   return (
@@ -181,12 +181,12 @@ export default async function DashboardPage() {
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {stats.map((s) => (
-          <div key={s.label} className="card p-5">
+          <Link key={s.label} href={s.href} className="card p-5 hover:border-primary-300 hover:shadow-md transition-all group">
             <div className={`inline-flex items-center justify-center w-10 h-10 rounded-lg ${s.bg} mb-3`}>
               <span className={`text-xl font-bold ${s.color}`}>{s.value}</span>
             </div>
-            <div className="text-sm text-slate-600">{s.label}</div>
-          </div>
+            <div className="text-sm text-slate-600 group-hover:text-slate-900 transition-colors">{s.label}</div>
+          </Link>
         ))}
       </div>
 

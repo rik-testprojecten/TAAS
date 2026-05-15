@@ -1,12 +1,27 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { STATUS_COLORS, TASK_TYPE_LABELS, TASK_STATUS_LABELS, IMPACT_COLORS, ISSUE_IMPACT_LABELS, formatDateTime } from "@/lib/utils";
 import { HelpButton } from "@/components/HelpButton";
 
+type Task = {
+  id: string;
+  type: string;
+  status: string;
+  title: string;
+  createdAt: string;
+  description?: string;
+  runStep?: { run?: { flowVersion?: { flow?: { phase?: { project?: { name: string } } } } }; name?: string } | null;
+  issue?: { id: string; title: string; impact?: string } | null;
+};
+
+const TYPE_ICONS: Record<string, string> = { STEP_EXECUTION: "🧪", RETEST: "🔄", QUESTION: "❓" };
+
 export default function TasksPage() {
-  const [tasks, setTasks] = useState<any[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filterStatus, setFilterStatus] = useState("");
+  const [filterType, setFilterType] = useState("");
 
   useEffect(() => { load(); }, []);
 
@@ -17,11 +32,15 @@ export default function TasksPage() {
     setLoading(false);
   }
 
-  const TYPE_ICONS: Record<string, string> = {
-    STEP_EXECUTION: "🧪",
-    RETEST: "🔄",
-    QUESTION: "❓",
-  };
+  const filtered = useMemo(() => {
+    return tasks.filter((t) => {
+      if (filterStatus && t.status !== filterStatus) return false;
+      if (filterType && t.type !== filterType) return false;
+      return true;
+    });
+  }, [tasks, filterStatus, filterType]);
+
+  const hasFilters = filterStatus || filterType;
 
   if (loading) return <div className="p-8 text-slate-500">Laden...</div>;
 
@@ -29,17 +48,67 @@ export default function TasksPage() {
     <div className="p-4 md:p-8">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-900">Mijn Taken</h1>
-        <p className="text-slate-500 text-sm mt-1">{tasks.length} openstaande taak{tasks.length !== 1 ? "en" : ""}</p>
+        <p className="text-slate-500 text-sm mt-1">
+          {filtered.length} van {tasks.length} taak{tasks.length !== 1 ? "en" : ""}
+        </p>
       </div>
+
+      {/* Filters */}
+      {tasks.length > 0 && (
+        <div className="card p-3 mb-5 flex flex-wrap gap-2 items-center">
+          <select
+            className="input w-auto text-sm"
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+          >
+            <option value="">Alle statussen</option>
+            <option value="OPEN">Open</option>
+            <option value="IN_PROGRESS">Bezig</option>
+            <option value="DONE">Afgerond</option>
+          </select>
+          <select
+            className="input w-auto text-sm"
+            value={filterType}
+            onChange={(e) => setFilterType(e.target.value)}
+          >
+            <option value="">Alle typen</option>
+            <option value="STEP_EXECUTION">Uitvoeren</option>
+            <option value="RETEST">Hertest</option>
+            <option value="QUESTION">Vraag</option>
+          </select>
+          {hasFilters && (
+            <button
+              onClick={() => { setFilterStatus(""); setFilterType(""); }}
+              className="text-sm text-slate-500 hover:text-slate-700"
+            >
+              Wis filters
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="space-y-3">
         {tasks.length === 0 ? (
-          <div className="card p-12 text-center text-slate-400 text-sm">Geen openstaande taken. Goed bezig!</div>
-        ) : tasks.map((task) => {
+          <div className="card p-12 text-center">
+            <div className="w-14 h-14 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-7 h-7 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+              </svg>
+            </div>
+            <p className="text-slate-700 font-medium">Geen openstaande taken</p>
+            <p className="text-slate-400 text-sm mt-1">Goed bezig! Je bent helemaal bij.</p>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="card p-10 text-center text-slate-400 text-sm">
+            Geen taken gevonden voor de geselecteerde filters.{" "}
+            <button onClick={() => { setFilterStatus(""); setFilterType(""); }} className="text-primary-600 hover:underline">
+              Filters wissen
+            </button>
+          </div>
+        ) : filtered.map((task) => {
           const run = task.runStep?.run;
           const project = run?.flowVersion?.flow?.phase?.project;
 
-          // QUESTION tasks: link to the issue, not a task detail page
           if (task.type === "QUESTION" && task.issue) {
             return (
               <Link key={task.id} href={`/issues/${task.issue.id}`} className="card p-4 hover:border-primary-300 transition-colors block">
@@ -62,7 +131,6 @@ export default function TasksPage() {
             );
           }
 
-          // STEP_EXECUTION and RETEST tasks: link to task detail page
           return (
             <Link key={task.id} href={`/tasks/${task.id}`} className="card p-4 hover:border-primary-300 transition-colors block">
               <div className="flex items-start gap-3">
@@ -79,7 +147,11 @@ export default function TasksPage() {
                   {task.issue && (
                     <div className="text-xs text-primary-600 mt-1">
                       Bevinding: {task.issue.title}
-                      {task.issue.impact && <span className={`ml-2 badge border text-xs ${IMPACT_COLORS[task.issue.impact]}`}>{ISSUE_IMPACT_LABELS[task.issue.impact]}</span>}
+                      {task.issue.impact && (
+                        <span className={`ml-2 badge border text-xs ${IMPACT_COLORS[task.issue.impact]}`}>
+                          {ISSUE_IMPACT_LABELS[task.issue.impact]}
+                        </span>
+                      )}
                     </div>
                   )}
                   <div className="text-xs text-slate-400 mt-1">{formatDateTime(task.createdAt)}</div>

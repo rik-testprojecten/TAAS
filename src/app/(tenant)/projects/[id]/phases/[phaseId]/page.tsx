@@ -473,11 +473,14 @@ export default function PhasePage() {
             }
             const hasSchedule = hasStart || hasEnd;
             return (
-              <div key={flow.id} className="flex items-center border-b border-slate-50 last:border-0">
-                <div className="w-44 shrink-0 px-4 py-2.5">
-                  <span className={`text-sm font-medium truncate block ${isClosed ? "text-slate-400" : "text-slate-700"}`}>
+              <Link key={flow.id} href={`/flows/${flow.id}`} className="flex items-center border-b border-slate-50 last:border-0 hover:bg-primary-50/40 transition-colors group">
+                <div className="w-44 shrink-0 px-4 py-2.5 flex items-center gap-1.5">
+                  <span className={`text-sm font-medium truncate block ${isClosed ? "text-slate-400" : "text-slate-700 group-hover:text-primary-700"} transition-colors`}>
                     {flow.name}
                   </span>
+                  <svg className="w-3 h-3 text-slate-300 group-hover:text-primary-500 shrink-0 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
                 </div>
                 <div className="flex-1 px-4 py-2.5">
                   <div className="relative h-6 rounded-full overflow-hidden bg-primary-50">
@@ -486,13 +489,13 @@ export default function PhasePage() {
                     ))}
                     {hasSchedule && (
                       <div
-                        className={`absolute top-0 h-full rounded-full ${isClosed ? "bg-slate-300" : "bg-primary-500"}`}
+                        className={`absolute top-0 h-full rounded-full transition-opacity group-hover:opacity-80 ${isClosed ? "bg-slate-300" : "bg-primary-500"}`}
                         style={{ left: `${barLeft}%`, width: `${barWidth}%` }}
                       />
                     )}
                   </div>
                 </div>
-              </div>
+              </Link>
             );
           })}
           </div>

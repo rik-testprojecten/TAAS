@@ -2,13 +2,12 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import { useToast } from "@/components/Toast";
 
 type InsertPosition = { type: "before" | "after" | "end"; stepId?: string };
 type StepForm = { title: string; instruction: string; expectedResult: string; assigneeIds: string[] };
 
 const EMPTY_NEW_FORM: StepForm = { title: "", instruction: "", expectedResult: "", assigneeIds: [] };
-
-// ── Top-level sub-components (outside main component to prevent re-mount on state change) ──
 
 function AssigneePills({
   users,
@@ -143,10 +142,10 @@ function InserterButton({
   );
 }
 
-// ── Main component ───────────────────────────────────────────────────────────
-
 export default function FlowBuilderPage() {
   const { id } = useParams<{ id: string }>();
+  const toast = useToast();
+
   const [flow, setFlow] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [editingStep, setEditingStep] = useState<string | null>(null);
@@ -162,6 +161,10 @@ export default function FlowBuilderPage() {
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
+
+  // Drag-and-drop state
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
 
   useEffect(() => { load(); }, [id]);
 
@@ -186,7 +189,7 @@ export default function FlowBuilderPage() {
 
   async function saveStep(stepId: string) {
     setSaving(true);
-    await fetch(`/api/flowSteps/${stepId}`, {
+    const res = await fetch(`/api/flowSteps/${stepId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(editForm),
@@ -194,11 +197,14 @@ export default function FlowBuilderPage() {
     setEditingStep(null);
     await load();
     setSaving(false);
+    if (res.ok) toast.success("Stap opgeslagen");
+    else toast.error("Fout bij opslaan");
   }
 
   async function deleteStep(stepId: string) {
     if (!confirm("Stap verwijderen?")) return;
     await fetch(`/api/flowSteps/${stepId}`, { method: "DELETE" });
+    toast.info("Stap verwijderd");
     load();
   }
 
@@ -213,7 +219,7 @@ export default function FlowBuilderPage() {
     };
     if (insertPos?.type === "after" && insertPos.stepId) body.afterStepId = insertPos.stepId;
     if (insertPos?.type === "before" && insertPos.stepId) body.beforeStepId = insertPos.stepId;
-    await fetch(`/api/flowVersions/${activeVersion.id}/steps`, {
+    const res = await fetch(`/api/flowVersions/${activeVersion.id}/steps`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -222,6 +228,17 @@ export default function FlowBuilderPage() {
     setNewStepForm(EMPTY_NEW_FORM);
     await load();
     setSaving(false);
+    if (res.ok) toast.success("Stap toegevoegd");
+    else toast.error("Fout bij toevoegen");
+  }
+
+  async function reorderSteps(orderedIds: string[]) {
+    await fetch(`/api/flowVersions/${activeVersion.id}/steps/reorder`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orderedIds }),
+    });
+    load();
   }
 
   async function moveStep(stepId: string, direction: "up" | "down") {
@@ -232,23 +249,54 @@ export default function FlowBuilderPage() {
     } else if (direction === "down" && idx < ids.length - 1) {
       [ids[idx], ids[idx + 1]] = [ids[idx + 1], ids[idx]];
     } else return;
-    await fetch(`/api/flowVersions/${activeVersion.id}/steps/reorder`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ orderedIds: ids }),
-    });
-    load();
+    await reorderSteps(ids);
+  }
+
+  // Drag-and-drop handlers
+  function handleDragStart(stepId: string) {
+    setDragId(stepId);
+    setEditingStep(null);
+    setInsertPos(null);
+  }
+
+  function handleDragOver(e: React.DragEvent, stepId: string) {
+    e.preventDefault();
+    if (stepId !== dragId) setDragOverId(stepId);
+  }
+
+  function handleDrop(e: React.DragEvent, targetId: string) {
+    e.preventDefault();
+    if (!dragId || dragId === targetId) {
+      setDragId(null);
+      setDragOverId(null);
+      return;
+    }
+    const ids = steps.map((s: any) => s.id);
+    const fromIdx = ids.indexOf(dragId);
+    const toIdx = ids.indexOf(targetId);
+    ids.splice(fromIdx, 1);
+    ids.splice(toIdx, 0, dragId);
+    setDragId(null);
+    setDragOverId(null);
+    reorderSteps(ids);
+    toast.info("Volgorde bijgewerkt");
+  }
+
+  function handleDragEnd() {
+    setDragId(null);
+    setDragOverId(null);
   }
 
   async function createNewVersion() {
     if (!confirm("Nieuwe versie aanmaken? De huidige stappen worden gekopieerd.")) return;
     await fetch(`/api/flows/${id}/versions`, { method: "POST" });
+    toast.success("Nieuwe versie aangemaakt");
     load();
   }
 
   async function saveMeta() {
     setSavingMeta(true);
-    await fetch(`/api/flows/${id}`, {
+    const res = await fetch(`/api/flows/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: metaForm.name, description: metaForm.description }),
@@ -256,6 +304,8 @@ export default function FlowBuilderPage() {
     setEditingMeta(false);
     await load();
     setSavingMeta(false);
+    if (res.ok) toast.success("Flow opgeslagen");
+    else toast.error("Fout bij opslaan");
   }
 
   async function closeFlow() {
@@ -268,6 +318,7 @@ export default function FlowBuilderPage() {
     setConfirmClose(false);
     await load();
     setSaving(false);
+    toast.info("Flow afgesloten");
   }
 
   async function handleImport(file: File) {
@@ -278,7 +329,13 @@ export default function FlowBuilderPage() {
     fd.append("file", file);
     const res = await fetch(`/api/flowVersions/${activeVersion.id}/import`, { method: "POST", body: fd });
     const data = await res.json();
-    if (!res.ok) { setImportError(data.error ?? "Importfout"); } else { await load(); }
+    if (!res.ok) {
+      setImportError(data.error ?? "Importfout");
+      toast.error(data.error ?? "Import mislukt");
+    } else {
+      await load();
+      toast.success("Stappen geïmporteerd");
+    }
     setImporting(false);
   }
 
@@ -368,7 +425,12 @@ export default function FlowBuilderPage() {
               />
               <div className="flex gap-2">
                 <button onClick={saveMeta} disabled={savingMeta || !metaForm.name} className="btn-primary text-sm">
-                  {savingMeta ? "Opslaan..." : "Opslaan"}
+                  {savingMeta ? (
+                    <span className="flex items-center gap-1.5">
+                      <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                      Opslaan...
+                    </span>
+                  ) : "Opslaan"}
                 </button>
                 <button onClick={() => setEditingMeta(false)} className="btn-secondary text-sm">Annuleren</button>
               </div>
@@ -416,7 +478,12 @@ export default function FlowBuilderPage() {
                 <>
                   <button onClick={() => importInputRef.current?.click()} disabled={importing} title="Importeer stappen uit Excel/CSV" className="btn-secondary text-sm flex items-center gap-1.5">
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l4-4m0 0l4 4m-4-4v12" /></svg>
-                    {importing ? "Importeren..." : "Importeren"}
+                    {importing ? (
+                      <span className="flex items-center gap-1">
+                        <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                        Importeren...
+                      </span>
+                    ) : "Importeren"}
                   </button>
                   <button onClick={downloadTemplate} title="Download invulsjabloon" className="btn-secondary text-sm flex items-center gap-1.5 text-primary-600">
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
@@ -447,7 +514,6 @@ export default function FlowBuilderPage() {
         </div>
       </div>
 
-      {/* Import foutmelding */}
       {importError && (
         <div className="mb-4 bg-red-50 border border-red-200 rounded-xl p-3 flex items-center justify-between text-sm text-red-700">
           <span>{importError}</span>
@@ -457,18 +523,32 @@ export default function FlowBuilderPage() {
         </div>
       )}
 
-      {/* Bevestiging flow afsluiten */}
       {confirmClose && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl p-6 w-full max-w-md">
             <h2 className="font-semibold text-lg mb-2">Flow afsluiten</h2>
             <p className="text-slate-500 text-sm mb-4">Weet je zeker dat je <strong>{flow.name}</strong> wilt afsluiten? Alle openstaande taken bij testers worden verwijderd.</p>
             <div className="flex gap-3">
-              <button onClick={closeFlow} disabled={saving} className="btn-primary flex-1">{saving ? "Afsluiten..." : "Afsluiten"}</button>
+              <button onClick={closeFlow} disabled={saving} className="btn-primary flex-1">
+                {saving ? (
+                  <span className="flex items-center justify-center gap-1.5">
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                    Afsluiten...
+                  </span>
+                ) : "Afsluiten"}
+              </button>
               <button onClick={() => setConfirmClose(false)} className="btn-secondary flex-1">Annuleren</button>
             </div>
           </div>
         </div>
+      )}
+
+      {/* DnD hint */}
+      {!hasRuns && !isClosed && steps.length > 1 && (
+        <p className="text-xs text-slate-400 mb-2 flex items-center gap-1.5">
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>
+          Versleep stappen om de volgorde te wijzigen, of gebruik de pijltjes.
+        </p>
       )}
 
       {/* Steps list */}
@@ -498,9 +578,16 @@ export default function FlowBuilderPage() {
         </div>
       ) : (
         <div className="max-w-3xl space-y-1">
-
           {steps.length === 0 && !insertPos && (
-            <div className="card p-8 text-center text-slate-400 text-sm">Nog geen stappen. Voeg de eerste stap toe.</div>
+            <div className="card p-10 text-center">
+              <div className="w-12 h-12 bg-primary-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                <svg className="w-6 h-6 text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+              </div>
+              <p className="text-slate-700 font-medium text-sm">Nog geen stappen</p>
+              <p className="text-slate-400 text-sm mt-1">Voeg de eerste stap toe om het testscript op te bouwen.</p>
+            </div>
           )}
 
           {/* Insert BEFORE first step */}
@@ -522,7 +609,6 @@ export default function FlowBuilderPage() {
           {steps.map((step: any, index: number) => (
             <div key={step.id}>
               {editingStep === step.id ? (
-                /* ── Edit form ── */
                 <div className="card p-5 border-2 border-primary-300">
                   <div className="space-y-3">
                     <div>
@@ -540,19 +626,45 @@ export default function FlowBuilderPage() {
                     <AssigneePills users={tenantUsers} selected={editForm.assigneeIds ?? []} onToggle={toggleInEdit} />
                     <div className="flex gap-2 pt-1">
                       <button onClick={() => saveStep(step.id)} disabled={saving} className="btn-primary text-sm">
-                        {saving ? "Opslaan..." : "Opslaan"}
+                        {saving ? (
+                          <span className="flex items-center gap-1.5">
+                            <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                            Opslaan...
+                          </span>
+                        ) : "Opslaan"}
                       </button>
                       <button onClick={() => setEditingStep(null)} className="btn-secondary text-sm">Annuleren</button>
                     </div>
                   </div>
                 </div>
               ) : (
-                /* ── Step card ── */
-                <div className="card">
+                <div
+                  className={`card transition-all ${
+                    dragId === step.id ? "opacity-40 scale-[0.98]" : ""
+                  } ${
+                    dragOverId === step.id && dragId !== step.id
+                      ? "border-primary-400 border-2 shadow-md"
+                      : ""
+                  }`}
+                  draggable={!hasRuns}
+                  onDragStart={() => handleDragStart(step.id)}
+                  onDragOver={(e) => handleDragOver(e, step.id)}
+                  onDrop={(e) => handleDrop(e, step.id)}
+                  onDragEnd={handleDragEnd}
+                >
                   <div className="flex items-start p-4 gap-3">
-                    {/* Reorder buttons */}
+                    {/* Drag handle + reorder buttons */}
                     {!hasRuns && (
                       <div className="flex flex-col gap-0.5 shrink-0 mt-0.5">
+                        {/* Drag handle */}
+                        <div
+                          className="p-1 cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500 rounded"
+                          title="Versleep om te herordenen"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M7 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 2zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 8zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 14zm6-8a2 2 0 1 0-.001-4.001A2 2 0 0 0 13 6zm0 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 8zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 14z" />
+                          </svg>
+                        </div>
                         <button
                           onClick={() => moveStep(step.id, "up")}
                           disabled={index === 0}
@@ -576,12 +688,10 @@ export default function FlowBuilderPage() {
                       </div>
                     )}
 
-                    {/* Step number */}
                     <div className="w-7 h-7 rounded-full bg-primary-100 text-primary-700 font-bold text-sm flex items-center justify-center shrink-0">
                       {index + 1}
                     </div>
 
-                    {/* Content */}
                     <div className="flex-1 min-w-0">
                       <h4 className="font-semibold text-slate-900">{step.title}</h4>
                       <p className="text-sm text-slate-600 mt-0.5 whitespace-pre-wrap">{step.instruction}</p>
@@ -602,7 +712,6 @@ export default function FlowBuilderPage() {
                       )}
                     </div>
 
-                    {/* Edit / Delete */}
                     {!hasRuns && (
                       <div className="flex gap-1 shrink-0">
                         <button
@@ -629,7 +738,6 @@ export default function FlowBuilderPage() {
                 </div>
               )}
 
-              {/* Insert AFTER this step / BEFORE next step */}
               {!hasRuns && (
                 insertPos?.type === "after" && insertPos.stepId === step.id
                   ? <div className="mt-1">
@@ -662,7 +770,6 @@ export default function FlowBuilderPage() {
             </div>
           ))}
 
-          {/* Add to end */}
           {!hasRuns && (
             insertPos?.type === "end"
               ? <NewStepForm
