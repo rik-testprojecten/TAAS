@@ -311,16 +311,16 @@ export default function PhasePage() {
   }
 
   return (
-    <div className="p-8">
-      <div className="flex items-center gap-2 text-sm text-slate-400 mb-6">
-        <Link href="/projects" className="hover:text-slate-600">Projecten</Link>
+    <div className="p-4 md:p-8">
+      <div className="flex items-center gap-1.5 text-sm text-slate-400 mb-4 flex-wrap">
+        <Link href="/projects" className="hover:text-slate-600 shrink-0">Projecten</Link>
         <span>/</span>
-        <Link href={`/projects/${id}`} className="hover:text-slate-600">{phase.project.name}</Link>
+        <Link href={`/projects/${id}`} className="hover:text-slate-600 min-w-0 truncate max-w-[140px] sm:max-w-none">{phase.project.name}</Link>
         <span>/</span>
-        <span className="text-slate-700">{phase.title ? `${phase.name} — ${phase.title}` : phase.name}</span>
+        <span className="text-slate-700 truncate max-w-[140px] sm:max-w-none">{phase.title ? `${phase.name} — ${phase.title}` : phase.name}</span>
       </div>
 
-      <div className="flex items-start justify-between mb-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-6">
         <div>
           <div className="flex items-center gap-3 mb-1">
             <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center shrink-0">
@@ -358,7 +358,7 @@ export default function PhasePage() {
           </div>
         </div>
 
-        <div className="flex gap-2 flex-wrap justify-end items-start">
+        <div className="flex gap-2 flex-wrap items-start">
           {/* Fase lifecycle knoppen */}
           {canStart && (
             <button
@@ -435,8 +435,9 @@ export default function PhasePage() {
       {/* ── FLOWS TAB ── */}
       {activeTab === "flows" && ganttData && phase.flows.length > 0 && (
         <div className="card mb-4 overflow-hidden">
+          <div className="overflow-x-auto">
           {/* Column header row */}
-          <div className="flex border-b border-slate-100 bg-slate-50">
+          <div className="flex border-b border-slate-100 bg-slate-50 min-w-[480px]">
             <div className="w-44 shrink-0 px-4 py-2">
               <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Balkenplanning</span>
             </div>
@@ -453,6 +454,7 @@ export default function PhasePage() {
             </div>
           </div>
           {/* Flow rows */}
+          <div className="min-w-[480px]">
           {phase.flows.map((flow: any) => {
             const isClosed = flow.status === "CLOSED";
             const hasStart = !!flow.scheduledStart;
@@ -493,6 +495,8 @@ export default function PhasePage() {
               </div>
             );
           })}
+          </div>
+          </div>
         </div>
       )}
 
@@ -507,93 +511,95 @@ export default function PhasePage() {
             const isClosed = flow.status === "CLOSED";
             return (
               <div key={flow.id} className={`card ${isClosed ? "opacity-70" : ""}`}>
-                <div className="flex items-center justify-between p-5">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-1">
-                      <h3 className="font-semibold text-slate-900">{flow.name}</h3>
-                      {latestVersion && <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{latestVersion.version}</span>}
-                      {isClosed && <span className="text-xs bg-slate-200 text-slate-600 px-2 py-0.5 rounded">Afgesloten</span>}
-                      {flow.sourceTemplateVersionId && (
-                        <span className="text-xs text-primary-600 bg-primary-50 px-2 py-0.5 rounded">Van template</span>
-                      )}
-                      {flow.sourceFlowVersionId && (
-                        <span className="text-xs text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">Overgenomen</span>
-                      )}
+                <div className="p-4 sm:p-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <h3 className="font-semibold text-slate-900">{flow.name}</h3>
+                        {latestVersion && <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{latestVersion.version}</span>}
+                        {isClosed && <span className="text-xs bg-slate-200 text-slate-600 px-2 py-0.5 rounded">Afgesloten</span>}
+                        {flow.sourceTemplateVersionId && (
+                          <span className="text-xs text-primary-600 bg-primary-50 px-2 py-0.5 rounded">Van template</span>
+                        )}
+                        {flow.sourceFlowVersionId && (
+                          <span className="text-xs text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">Overgenomen</span>
+                        )}
+                      </div>
+                      {flow.description && <p className="text-sm text-slate-500 mb-2">{flow.description}</p>}
+                      <div className="flex items-center gap-3 text-xs text-slate-400 flex-wrap">
+                        <span>{latestVersion?._count?.steps ?? 0} stappen</span>
+                        <span>{latestVersion?._count?.runs ?? 0} runs</span>
+                        <span className="hidden sm:inline">Bijgewerkt {formatDate(flow.updatedAt)}</span>
+                        {(flow.scheduledStart || flow.scheduledEnd) && (
+                          <span className="text-primary-600 bg-primary-50 px-2 py-0.5 rounded">
+                            {flow.scheduledStart && new Date(flow.scheduledStart).toLocaleDateString("nl-NL")}
+                            {flow.scheduledStart && flow.scheduledEnd && " → "}
+                            {flow.scheduledEnd && new Date(flow.scheduledEnd).toLocaleDateString("nl-NL")}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    {flow.description && <p className="text-sm text-slate-500 mb-2">{flow.description}</p>}
-                    <div className="flex items-center gap-4 text-xs text-slate-400 flex-wrap">
-                      <span>{latestVersion?._count?.steps ?? 0} stappen</span>
-                      <span>{latestVersion?._count?.runs ?? 0} runs</span>
-                      <span>Bijgewerkt {formatDate(flow.updatedAt)}</span>
-                      {(flow.scheduledStart || flow.scheduledEnd) && (
-                        <span className="text-primary-600 bg-primary-50 px-2 py-0.5 rounded">
-                          {flow.scheduledStart && new Date(flow.scheduledStart).toLocaleDateString("nl-NL")}
-                          {flow.scheduledStart && flow.scheduledEnd && " → "}
-                          {flow.scheduledEnd && new Date(flow.scheduledEnd).toLocaleDateString("nl-NL")}
-                        </span>
+                    {/* Icon-only actions (always visible) */}
+                    <div className="flex gap-1 items-center shrink-0">
+                      <button
+                        onClick={() => {
+                          setShowFlowDates({ flow });
+                          setFlowDatesForm({
+                            scheduledStart: flow.scheduledStart ? new Date(flow.scheduledStart).toISOString().split("T")[0] : "",
+                            scheduledEnd: flow.scheduledEnd ? new Date(flow.scheduledEnd).toISOString().split("T")[0] : "",
+                          });
+                        }}
+                        title="Planning instellen"
+                        className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => { setShowCopy({ flow }); setCopyForm({ name: `${flow.name} (kopie)`, targetPhaseId: "" }); }}
+                        title="Flow kopiëren"
+                        className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                      </button>
+                      {!isClosed && (
+                        <button
+                          onClick={() => setConfirmClose({ flowId: flow.id, name: flow.name })}
+                          title="Flow afsluiten"
+                          className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </button>
                       )}
+                      <button
+                        onClick={() => setConfirmDelete({ flowId: flow.id, name: flow.name })}
+                        title="Flow verwijderen"
+                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
                     </div>
                   </div>
-                  <div className="flex gap-2 ml-4 items-center">
-                    {!isClosed && latestVersion && (
-                      <Link href={`/runs/new?versionId=${latestVersion.id}&flowName=${encodeURIComponent(flow.name)}`} className="btn-secondary text-sm">
-                        Run starten
-                      </Link>
-                    )}
-                    {!isClosed && (
+                  {/* Primary action buttons below on all screens */}
+                  {(!isClosed) && (
+                    <div className="flex gap-2 mt-3 flex-wrap">
+                      {latestVersion && (
+                        <Link href={`/runs/new?versionId=${latestVersion.id}&flowName=${encodeURIComponent(flow.name)}`} className="btn-secondary text-sm">
+                          Run starten
+                        </Link>
+                      )}
                       <Link href={`/flows/${flow.id}`} className="btn-primary text-sm">
                         Bewerken
                       </Link>
-                    )}
-                    {/* Planning */}
-                    <button
-                      onClick={() => {
-                        setShowFlowDates({ flow });
-                        setFlowDatesForm({
-                          scheduledStart: flow.scheduledStart ? new Date(flow.scheduledStart).toISOString().split("T")[0] : "",
-                          scheduledEnd: flow.scheduledEnd ? new Date(flow.scheduledEnd).toISOString().split("T")[0] : "",
-                        });
-                      }}
-                      title="Planning instellen"
-                      className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                    </button>
-                    {/* Kopiëren */}
-                    <button
-                      onClick={() => { setShowCopy({ flow }); setCopyForm({ name: `${flow.name} (kopie)`, targetPhaseId: "" }); }}
-                      title="Flow kopiëren"
-                      className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                      </svg>
-                    </button>
-                    {/* Afsluiten */}
-                    {!isClosed && (
-                      <button
-                        onClick={() => setConfirmClose({ flowId: flow.id, name: flow.name })}
-                        title="Flow afsluiten"
-                        className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded"
-                      >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                      </button>
-                    )}
-                    {/* Verwijderen */}
-                    <button
-                      onClick={() => setConfirmDelete({ flowId: flow.id, name: flow.name })}
-                      title="Flow verwijderen"
-                      className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
-                  </div>
+                    </div>
+                  )}
                 </div>
                 {latestVersion?.runs && latestVersion.runs.length > 0 && (
                   <div className="border-t border-slate-100 px-5 py-3 flex gap-4">

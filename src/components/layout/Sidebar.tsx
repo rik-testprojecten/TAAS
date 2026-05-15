@@ -365,16 +365,23 @@ export function TenantSidebar({
 
   return (
     <>
-      {/* Mobile hamburger */}
-      <button
-        className="fixed top-4 left-4 z-40 md:hidden bg-forest-700 text-white p-2 rounded-lg shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-400"
-        onClick={() => setMobileOpen(true)}
-        aria-label="Menu openen"
-      >
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-        </svg>
-      </button>
+      {/* Mobile top bar */}
+      <div className="fixed top-0 left-0 right-0 h-14 bg-forest-700 flex items-center px-3 gap-3 z-40 md:hidden shadow-lg">
+        <button
+          className="text-white p-2 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 shrink-0"
+          onClick={() => setMobileOpen(true)}
+          aria-label="Menu openen"
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+        {(logoBase64) ? (
+          <img src={logoBase64} alt="Logo" className="h-7 w-auto object-contain" />
+        ) : (
+          <span className="text-white font-semibold text-sm truncate">{tenantName || "TAAS"}</span>
+        )}
+      </div>
 
       {/* Mobile overlay */}
       {mobileOpen && (

@@ -31,7 +31,7 @@ export default async function TenantLayout({ children }: { children: React.React
           tenantName={settings?.orgName || tenant?.name}
           logoBase64={settings?.logoBase64 ?? null}
         />
-        <main className="md:ml-60 flex-1 min-h-screen bg-slate-50">
+        <main className="md:ml-60 flex-1 min-h-screen bg-slate-50 pt-14 md:pt-0">
           {children}
         </main>
       </div>

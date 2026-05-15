@@ -101,27 +101,27 @@ export default function RunPage() {
   }
 
   return (
-    <div className="p-8">
-      <div className="flex items-center gap-2 text-sm text-slate-400 mb-6">
-        <Link href="/projects" className="hover:text-slate-600">Projecten</Link>
+    <div className="p-4 md:p-8">
+      <div className="flex items-center gap-1.5 text-sm text-slate-400 mb-4 flex-wrap">
+        <Link href="/projects" className="hover:text-slate-600 shrink-0">Projecten</Link>
         <span>/</span>
-        <Link href={`/projects/${project.id}`} className="hover:text-slate-600">{project.name}</Link>
+        <Link href={`/projects/${project.id}`} className="hover:text-slate-600 truncate max-w-[120px] sm:max-w-none">{project.name}</Link>
         <span>/</span>
-        <Link href={`/projects/${project.id}/phases/${phase.id}`} className="hover:text-slate-600">{phase.name}</Link>
+        <Link href={`/projects/${project.id}/phases/${phase.id}`} className="hover:text-slate-600 shrink-0">{phase.name}</Link>
         <span>/</span>
-        <span className="text-slate-700">{run.name}</span>
+        <span className="text-slate-700 truncate max-w-[120px] sm:max-w-none">{run.name}</span>
       </div>
 
-      <div className="flex items-start justify-between mb-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">{run.name}</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900">{run.name}</h1>
           <p className="text-slate-500 text-sm">{flow.name} — {run.flowVersion.version}</p>
           <div className="flex items-center gap-3 mt-2">
             <span className={`badge ${STATUS_COLORS[run.status]}`}>{run.status.replace("_", " ")}</span>
           </div>
         </div>
         {run.status === "DRAFT" && (
-          <button onClick={startRun} className="btn-primary">Run starten</button>
+          <button onClick={startRun} className="btn-primary self-start">Run starten</button>
         )}
       </div>
 
@@ -244,7 +244,7 @@ export default function RunPage() {
 
                 {/* Execution controls */}
                 {canAct && activeStep !== step.id && (
-                  <div className="flex items-center gap-2 mt-3 ml-12">
+                  <div className="flex items-center gap-2 mt-3 ml-8 sm:ml-12 flex-wrap">
                     <button
                       onClick={() => { setActiveStep(step.id); setStepForm({ status: "PASSED", result: "", notes: "" }); }}
                       className="text-xs btn-secondary"
@@ -262,7 +262,7 @@ export default function RunPage() {
 
                 {/* Unlocked but not assigned to me */}
                 {unlocked && !terminal && hasAssignees && !iAmAssignee && run.status === "IN_PROGRESS" && (
-                  <div className="mt-3 ml-12">
+                  <div className="mt-3 ml-8 sm:ml-12">
                     <button
                       onClick={() => setShowIssueFor(step.id)}
                       className="text-xs text-red-600 hover:text-red-700 border border-red-200 px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
@@ -274,8 +274,8 @@ export default function RunPage() {
 
                 {/* Step result form */}
                 {activeStep === step.id && (
-                  <div className="mt-3 ml-12 space-y-3 p-3 bg-slate-50 rounded-lg">
-                    <div className="flex gap-3">
+                  <div className="mt-3 ml-8 sm:ml-12 space-y-3 p-3 bg-slate-50 rounded-lg">
+                    <div className="flex gap-2 flex-wrap">
                       {["PASSED", "FAILED", "BLOCKED"].map((s) => (
                         <button
                           key={s}

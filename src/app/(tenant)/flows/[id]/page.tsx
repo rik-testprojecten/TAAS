@@ -338,18 +338,18 @@ export default function FlowBuilderPage() {
   if (!flow || flow.error) return <div className="p-8 text-slate-500">Flow niet gevonden</div>;
 
   return (
-    <div className="p-8">
-      <div className="flex items-center gap-2 text-sm text-slate-400 mb-6">
-        <Link href="/projects" className="hover:text-slate-600">Projecten</Link>
+    <div className="p-4 md:p-8">
+      <div className="flex items-center gap-1.5 text-sm text-slate-400 mb-4 flex-wrap">
+        <Link href="/projects" className="hover:text-slate-600 shrink-0">Projecten</Link>
         <span>/</span>
-        <Link href={`/projects/${flow.phase.project.id}`} className="hover:text-slate-600">{flow.phase.project.name}</Link>
+        <Link href={`/projects/${flow.phase.project.id}`} className="hover:text-slate-600 truncate max-w-[120px] sm:max-w-none">{flow.phase.project.name}</Link>
         <span>/</span>
-        <Link href={`/projects/${flow.phase.project.id}/phases/${flow.phase.id}`} className="hover:text-slate-600">{flow.phase.name}</Link>
+        <Link href={`/projects/${flow.phase.project.id}/phases/${flow.phase.id}`} className="hover:text-slate-600 shrink-0">{flow.phase.name}</Link>
         <span>/</span>
-        <span className="text-slate-700">{flow.name}</span>
+        <span className="text-slate-700 truncate max-w-[120px] sm:max-w-none">{flow.name}</span>
       </div>
 
-      <div className="flex items-start justify-between mb-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-6">
         <div className="flex-1 min-w-0 mr-4">
           {editingMeta ? (
             <div className="space-y-2 max-w-lg">
@@ -405,7 +405,7 @@ export default function FlowBuilderPage() {
             </div>
           )}
         </div>
-        <div className="flex gap-2 shrink-0 flex-wrap">
+        <div className="flex gap-2 flex-wrap">
           {activeVersion && (
             <>
               <button onClick={handleExport} title="Exporteer stappen als Excel" className="btn-secondary text-sm flex items-center gap-1.5">

@@ -94,14 +94,14 @@ export default function ProjectPage() {
   if (!project) return <div className="p-8 text-slate-500">Project niet gevonden</div>;
 
   return (
-    <div className="p-8">
-      <div className="flex items-center gap-2 text-sm text-slate-400 mb-6">
+    <div className="p-4 md:p-8">
+      <div className="flex items-center gap-2 text-sm text-slate-400 mb-6 flex-wrap">
         <Link href="/projects" className="hover:text-slate-600">Projecten</Link>
         <span>/</span>
-        <span className="text-slate-700">{project.name}</span>
+        <span className="text-slate-700 truncate max-w-[200px] sm:max-w-none">{project.name}</span>
       </div>
 
-      <div className="flex items-start justify-between mb-8">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">{project.name}</h1>
           {project.description && <p className="text-slate-500 text-sm mt-1">{project.description}</p>}
@@ -110,7 +110,7 @@ export default function ProjectPage() {
             <span className="text-xs text-slate-400">Aangemaakt {formatDate(project.createdAt)}</span>
           </div>
         </div>
-        <button onClick={() => setShowAddPhase(true)} className="btn-primary flex items-center gap-2">
+        <button onClick={() => setShowAddPhase(true)} className="btn-primary flex items-center gap-2 self-start sm:self-auto">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
           Fase toevoegen
         </button>

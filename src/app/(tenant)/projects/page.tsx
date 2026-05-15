@@ -34,13 +34,13 @@ export default function ProjectsPage() {
   if (loading) return <div className="p-8 text-slate-500">Laden...</div>;
 
   return (
-    <div className="p-8">
-      <div className="flex items-center justify-between mb-8">
+    <div className="p-4 md:p-8">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Projecten</h1>
           <p className="text-slate-500 text-sm mt-1">{projects.length} project{projects.length !== 1 ? "en" : ""}</p>
         </div>
-        <button onClick={() => setShowNew(true)} className="btn-primary flex items-center gap-2">
+        <button onClick={() => setShowNew(true)} className="btn-primary flex items-center gap-2 self-start sm:self-auto">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
           Nieuw project
         </button>
@@ -111,7 +111,7 @@ export default function ProjectsPage() {
                   )}
                 </div>
               </div>
-              <span className={`badge ${STATUS_COLORS[p.status]} ml-4`}>{p.status}</span>
+              <span className={`badge ${STATUS_COLORS[p.status]} shrink-0`}>{p.status}</span>
             </div>
           </Link>
         ))}

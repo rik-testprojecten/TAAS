@@ -23,7 +23,7 @@ export default function MyIssuesPage() {
   const withdrawnIssues = issues.filter((i) => i.status === "WITHDRAWN");
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-900">Mijn Bevindingen</h1>
         <p className="text-slate-500 text-sm mt-1">Overzicht van alle bevindingen die jij hebt gemeld</p>
@@ -70,8 +70,8 @@ function IssueCard({ issue, withdrawn }: { issue: any; withdrawn?: boolean }) {
       href={`/issues/${issue.id}`}
       className={`card p-4 hover:border-primary-300 transition-colors block ${withdrawn ? "opacity-75" : ""}`}
     >
-      <div className="flex items-start justify-between">
-        <div className="flex-1">
+      <div className="flex items-start gap-3">
+        <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <span className={`badge border text-xs ${IMPACT_COLORS[issue.impact]}`}>{ISSUE_IMPACT_LABELS[issue.impact]}</span>
             <span className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded">{ISSUE_TYPE_LABELS[issue.type]}</span>
@@ -87,7 +87,7 @@ function IssueCard({ issue, withdrawn }: { issue: any; withdrawn?: boolean }) {
             {issue._count?.comments > 0 && <span>{issue._count.comments} reactie{issue._count.comments !== 1 ? "s" : ""}</span>}
           </div>
         </div>
-        <span className={`badge ml-4 ${withdrawn ? "bg-gray-100 text-gray-600" : (STATUS_COLORS[issue.status] ?? "bg-gray-100 text-gray-700")}`}>
+        <span className={`badge shrink-0 ${withdrawn ? "bg-gray-100 text-gray-600" : (STATUS_COLORS[issue.status] ?? "bg-gray-100 text-gray-700")}`}>
           {ISSUE_STATUS_LABELS[issue.status] ?? issue.status}
         </span>
       </div>

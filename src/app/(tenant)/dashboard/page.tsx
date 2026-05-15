@@ -166,15 +166,15 @@ export default async function DashboardPage() {
   ];
 
   return (
-    <div className="p-8">
-      <div className="mb-8 flex items-start justify-between">
+    <div className="p-4 md:p-8">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
           <p className="text-slate-500 text-sm mt-1">Welkom terug, {session!.user.name}</p>
         </div>
         {settings?.logoBase64 && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={settings.logoBase64} alt="Logo" className="h-12 w-auto object-contain" />
+          <img src={settings.logoBase64} alt="Logo" className="h-12 w-auto object-contain shrink-0 self-start" />
         )}
       </div>
 

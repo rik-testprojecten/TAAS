@@ -29,7 +29,7 @@ export default function IssuesPage() {
   if (loading) return <div className="p-8 text-slate-500">Laden...</div>;
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Bevindingen</h1>
@@ -82,8 +82,8 @@ export default function IssuesPage() {
           const sla = getIssueSlaInfo(issue.createdAt, issue.impact, issue.status);
           return (
             <Link key={issue.id} href={`/issues/${issue.id}`} className={`card p-4 hover:border-primary-300 transition-colors block ${sla.isOverdue ? "border-red-200 bg-red-50/30" : ""}`}>
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
+              <div className="flex items-start gap-3">
+                <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <span className={`badge border text-xs ${IMPACT_COLORS[issue.impact]}`}>{ISSUE_IMPACT_LABELS[issue.impact]}</span>
                     <span className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded">{ISSUE_TYPE_LABELS[issue.type]}</span>
@@ -106,7 +106,7 @@ export default function IssuesPage() {
                     {(issue._count?.comments ?? 0) > 0 && <span>{issue._count!.comments} reactie{issue._count!.comments !== 1 ? "s" : ""}</span>}
                   </div>
                 </div>
-                <span className={`badge ${STATUS_COLORS[issue.status]} ml-4`}>{ISSUE_STATUS_LABELS[issue.status]}</span>
+                <span className={`badge ${STATUS_COLORS[issue.status]} shrink-0`}>{ISSUE_STATUS_LABELS[issue.status]}</span>
               </div>
             </Link>
           );

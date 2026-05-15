@@ -26,8 +26,8 @@ export default function TasksPage() {
   if (loading) return <div className="p-8 text-slate-500">Laden...</div>;
 
   return (
-    <div className="p-8">
-      <div className="mb-8">
+    <div className="p-4 md:p-8">
+      <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-900">Mijn Taken</h1>
         <p className="text-slate-500 text-sm mt-1">{tasks.length} openstaande taak{tasks.length !== 1 ? "en" : ""}</p>
       </div>
