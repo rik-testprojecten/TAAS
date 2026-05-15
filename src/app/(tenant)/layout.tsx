@@ -2,6 +2,8 @@ import { auth } from "../../../auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { TenantSidebar } from "@/components/layout/Sidebar";
+import { KeyboardProvider } from "@/components/KeyboardProvider";
+import { SearchModal } from "@/components/SearchModal";
 
 export default async function TenantLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -20,16 +22,19 @@ export default async function TenantLayout({ children }: { children: React.React
   }
 
   return (
-    <div className="flex min-h-screen">
-      <TenantSidebar
-        roles={session.user.roles}
-        userName={session.user.name || ""}
-        tenantName={settings?.orgName || tenant?.name}
-        logoBase64={settings?.logoBase64 ?? null}
-      />
-      <main className="ml-60 flex-1 min-h-screen bg-slate-50">
-        {children}
-      </main>
-    </div>
+    <KeyboardProvider>
+      <SearchModal />
+      <div className="flex min-h-screen">
+        <TenantSidebar
+          roles={session.user.roles}
+          userName={session.user.name || ""}
+          tenantName={settings?.orgName || tenant?.name}
+          logoBase64={settings?.logoBase64 ?? null}
+        />
+        <main className="md:ml-60 flex-1 min-h-screen bg-slate-50">
+          {children}
+        </main>
+      </div>
+    </KeyboardProvider>
   );
 }

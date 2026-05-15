@@ -3,12 +3,14 @@ import { prisma } from "@/lib/prisma";
 import { requireTenantAuth } from "@/lib/api-helpers";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
+import { sendInviteMail } from "@/lib/mailer";
 
 const createSchema = z.object({
   name: z.string().min(2),
   email: z.string().email(),
   password: z.string().min(8),
   roles: z.array(z.enum(["TENANT_ADMIN", "SCRIPT_WRITER", "TESTER", "FUNCTIONAL_MANAGER"])),
+  sendInvite: z.boolean().optional().default(false),
 });
 
 export async function GET() {
@@ -37,9 +39,24 @@ export async function POST(req: NextRequest) {
   if (existing) return NextResponse.json({ error: "Email already in use" }, { status: 409 });
 
   const hashed = await bcrypt.hash(parsed.data.password, 10);
+  const { sendInvite, ...userData } = parsed.data;
+
   const user = await prisma.tenantUser.create({
-    data: { ...parsed.data, password: hashed, tenantId },
+    data: { ...userData, password: hashed, tenantId },
     select: { id: true, name: true, email: true, roles: true, isActive: true },
   });
-  return NextResponse.json(user, { status: 201 });
+
+  let inviteSent = false;
+  if (sendInvite) {
+    const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { name: true } });
+    const settings = await prisma.tenantSettings.findUnique({ where: { tenantId }, select: { orgName: true } });
+    inviteSent = await sendInviteMail({
+      to: parsed.data.email,
+      name: parsed.data.name,
+      tempPassword: parsed.data.password,
+      tenantName: settings?.orgName ?? tenant?.name ?? "TAAS",
+    });
+  }
+
+  return NextResponse.json({ ...user, inviteSent }, { status: 201 });
 }

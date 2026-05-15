@@ -91,3 +91,34 @@ export const TASK_TYPE_LABELS: Record<string, string> = {
   RETEST: "Hertest",
   QUESTION: "Vraag beantwoorden",
 };
+
+// SLA thresholds in days per impact level
+export const SLA_DAYS: Record<string, number> = {
+  CRITICAL: 1,
+  HIGH: 3,
+  MEDIUM: 7,
+  LOW: 14,
+};
+
+export function getIssueSlaInfo(createdAt: string | Date, impact: string, status: string): {
+  ageDays: number;
+  ageLabel: string;
+  isOverdue: boolean;
+  slaDays: number;
+} {
+  const resolved = ["RESOLVED", "REJECTED", "WITHDRAWN"].includes(status);
+  const created = new Date(createdAt);
+  const now = new Date();
+  const ageDays = Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
+  const slaDays = SLA_DAYS[impact] ?? 7;
+  const isOverdue = !resolved && ageDays > slaDays;
+
+  let ageLabel: string;
+  if (ageDays === 0) ageLabel = "Vandaag";
+  else if (ageDays === 1) ageLabel = "1 dag";
+  else if (ageDays < 7) ageLabel = `${ageDays} dagen`;
+  else if (ageDays < 30) ageLabel = `${Math.floor(ageDays / 7)}w`;
+  else ageLabel = `${Math.floor(ageDays / 30)}m`;
+
+  return { ageDays, ageLabel, isOverdue, slaDays };
+}

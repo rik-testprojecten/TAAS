@@ -3,18 +3,19 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { cn } from "@/lib/utils";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 
 type NavItem = { href: string; label: string; icon: React.ReactNode };
 
-function NavLink({ item }: { item: NavItem }) {
+function NavLink({ item, onNavigate }: { item: NavItem; onNavigate?: () => void }) {
   const path = usePathname();
   const active = path === item.href || (item.href !== "/dashboard" && path.startsWith(item.href));
   return (
     <Link
       href={item.href}
+      onClick={onNavigate}
       className={cn(
-        "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors",
+        "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-400",
         active
           ? "bg-primary-600 text-white"
           : "text-slate-300 hover:bg-forest-600 hover:text-white"
@@ -26,16 +27,18 @@ function NavLink({ item }: { item: NavItem }) {
   );
 }
 
-export function TenantSidebar({
+function SidebarContent({
   roles,
   userName,
   tenantName,
   logoBase64,
+  onNavigate,
 }: {
   roles: string[];
   userName: string;
   tenantName?: string;
   logoBase64?: string | null;
+  onNavigate?: () => void;
 }) {
   const router = useRouter();
   const isAdmin = roles.includes("TENANT_ADMIN");
@@ -113,6 +116,11 @@ export function TenantSidebar({
       label: "Mijn Bevindingen",
       icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>,
     },
+    {
+      href: "/checklists",
+      label: "Checklists",
+      icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>,
+    },
   ];
 
   const reportItems: NavItem[] = [
@@ -142,8 +150,8 @@ export function TenantSidebar({
   ];
 
   return (
-    <aside className="fixed left-0 top-0 h-full w-60 bg-forest-700 flex flex-col z-10">
-      {/* Logo — clickable for admins */}
+    <>
+      {/* Logo */}
       <div
         className={`px-4 py-5 border-b border-forest-900 ${isAdmin ? "cursor-pointer hover:bg-forest-600 transition-colors group" : ""}`}
         onClick={isAdmin ? () => { setSettingsForm({ orgName: tenantName || "", logoBase64: logoBase64 || "" }); setShowSettings(true); } : undefined}
@@ -252,16 +260,31 @@ export function TenantSidebar({
         </div>
       )}
 
+      {/* Zoekbalk */}
+      <div className="px-3 py-2 border-b border-forest-900">
+        <button
+          onClick={() => window.dispatchEvent(new CustomEvent("taas:open-search"))}
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-forest-600/50 hover:bg-forest-600 text-forest-300 hover:text-white text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-400"
+          aria-label="Zoeken (Ctrl+K)"
+        >
+          <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <span className="flex-1 text-left">Zoeken...</span>
+          <kbd className="hidden sm:block text-xs font-mono bg-forest-800/60 px-1.5 py-0.5 rounded shrink-0">⌃K</kbd>
+        </button>
+      </div>
+
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
-        {commonItems.map((item) => <NavLink key={item.href} item={item} />)}
+      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1" aria-label="Hoofdnavigatie">
+        {commonItems.map((item) => <NavLink key={item.href} item={item} onNavigate={onNavigate} />)}
 
         {(isAdmin || isScriptWriter) && (
           <>
             <div className="pt-4 pb-1 px-3">
               <span className="text-xs font-semibold text-forest-400 uppercase tracking-wider">Testbeheer</span>
             </div>
-            {projectItems.map((item) => <NavLink key={item.href} item={item} />)}
+            {projectItems.map((item) => <NavLink key={item.href} item={item} onNavigate={onNavigate} />)}
           </>
         )}
 
@@ -270,14 +293,12 @@ export function TenantSidebar({
             <div className="pt-4 pb-1 px-3">
               <span className="text-xs font-semibold text-forest-400 uppercase tracking-wider">Kwaliteit</span>
             </div>
-            {issueItems.map((item) => <NavLink key={item.href} item={item} />)}
+            {issueItems.map((item) => <NavLink key={item.href} item={item} onNavigate={onNavigate} />)}
           </>
         )}
 
         {(isAdmin || isFM) && (
-          <>
-            {reportItems.map((item) => <NavLink key={item.href} item={item} />)}
-          </>
+          <>{reportItems.map((item) => <NavLink key={item.href} item={item} onNavigate={onNavigate} />)}</>
         )}
 
         {isAdmin && (
@@ -285,7 +306,7 @@ export function TenantSidebar({
             <div className="pt-4 pb-1 px-3">
               <span className="text-xs font-semibold text-forest-400 uppercase tracking-wider">Beheer</span>
             </div>
-            {adminItems.map((item) => <NavLink key={item.href} item={item} />)}
+            {adminItems.map((item) => <NavLink key={item.href} item={item} onNavigate={onNavigate} />)}
           </>
         )}
       </nav>
@@ -303,7 +324,7 @@ export function TenantSidebar({
         </div>
         <button
           onClick={() => signOut({ callbackUrl: "/login" })}
-          className="w-full flex items-center gap-3 px-3 py-2 text-slate-400 hover:text-white hover:bg-forest-600 rounded-lg text-sm transition-colors"
+          className="w-full flex items-center gap-3 px-3 py-2 text-slate-400 hover:text-white hover:bg-forest-600 rounded-lg text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-400"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -311,7 +332,97 @@ export function TenantSidebar({
           Uitloggen
         </button>
       </div>
-    </aside>
+    </>
+  );
+}
+
+export function TenantSidebar({
+  roles,
+  userName,
+  tenantName,
+  logoBase64,
+}: {
+  roles: string[];
+  userName: string;
+  tenantName?: string;
+  logoBase64?: string | null;
+}) {
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const pathname = usePathname();
+
+  // Close drawer on route change
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
+
+  // Close on Escape
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") setMobileOpen(false); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [mobileOpen]);
+
+  return (
+    <>
+      {/* Mobile hamburger */}
+      <button
+        className="fixed top-4 left-4 z-40 md:hidden bg-forest-700 text-white p-2 rounded-lg shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-400"
+        onClick={() => setMobileOpen(true)}
+        aria-label="Menu openen"
+      >
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
+
+      {/* Mobile overlay */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={() => setMobileOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Desktop sidebar (always visible) */}
+      <aside className="fixed left-0 top-0 h-full w-60 bg-forest-700 flex-col z-30 hidden md:flex">
+        <SidebarContent
+          roles={roles}
+          userName={userName}
+          tenantName={tenantName}
+          logoBase64={logoBase64}
+        />
+      </aside>
+
+      {/* Mobile drawer */}
+      <aside
+        className={cn(
+          "fixed left-0 top-0 h-full w-72 bg-forest-700 flex flex-col z-50 md:hidden transition-transform duration-200",
+          mobileOpen ? "translate-x-0" : "-translate-x-full"
+        )}
+        aria-label="Navigatiemenu"
+      >
+        <div className="flex items-center justify-end px-3 pt-3">
+          <button
+            onClick={() => setMobileOpen(false)}
+            className="text-forest-300 hover:text-white p-1 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-400"
+            aria-label="Menu sluiten"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <SidebarContent
+          roles={roles}
+          userName={userName}
+          tenantName={tenantName}
+          logoBase64={logoBase64}
+          onNavigate={() => setMobileOpen(false)}
+        />
+      </aside>
+    </>
   );
 }
 
@@ -349,7 +460,7 @@ export function PlatformSidebar({ userName }: { userName: string }) {
           </div>
         </div>
       </div>
-      <nav className="flex-1 px-3 py-4 space-y-1">
+      <nav className="flex-1 px-3 py-4 space-y-1" aria-label="Platform navigatie">
         {platformItems.map((item) => <NavLink key={item.href} item={item} />)}
       </nav>
       <div className="px-3 py-4 border-t border-forest-900">

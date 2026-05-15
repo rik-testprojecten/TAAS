@@ -1,11 +1,12 @@
 "use client";
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { STATUS_COLORS, IMPACT_COLORS, ISSUE_TYPE_LABELS, ISSUE_IMPACT_LABELS, ISSUE_STATUS_LABELS, formatDateTime } from "@/lib/utils";
+import { STATUS_COLORS, IMPACT_COLORS, ISSUE_TYPE_LABELS, ISSUE_IMPACT_LABELS, ISSUE_STATUS_LABELS, formatDateTime, getIssueSlaInfo } from "@/lib/utils";
 import { HelpButton } from "@/components/HelpButton";
+import type { Issue } from "@/types";
 
 export default function IssuesPage() {
-  const [issues, setIssues] = useState<any[]>([]);
+  const [issues, setIssues] = useState<Issue[]>([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({ status: "", type: "", impact: "" });
 
@@ -78,21 +79,31 @@ export default function IssuesPage() {
           <div className="card p-12 text-center text-slate-400 text-sm">Geen bevindingen gevonden</div>
         ) : issues.map((issue) => {
           const project = issue.runStep?.run?.flowVersion?.flow?.phase?.project;
+          const sla = getIssueSlaInfo(issue.createdAt, issue.impact, issue.status);
           return (
-            <Link key={issue.id} href={`/issues/${issue.id}`} className="card p-4 hover:border-primary-300 transition-colors block">
+            <Link key={issue.id} href={`/issues/${issue.id}`} className={`card p-4 hover:border-primary-300 transition-colors block ${sla.isOverdue ? "border-red-200 bg-red-50/30" : ""}`}>
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <span className={`badge border text-xs ${IMPACT_COLORS[issue.impact]}`}>{ISSUE_IMPACT_LABELS[issue.impact]}</span>
                     <span className="text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded">{ISSUE_TYPE_LABELS[issue.type]}</span>
                     {issue.retestRequired && <span className="text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded">Hertest vereist</span>}
+                    {sla.isOverdue && (
+                      <span className="text-xs text-red-700 bg-red-100 px-2 py-0.5 rounded font-medium flex items-center gap-1">
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        SLA verlopen
+                      </span>
+                    )}
                   </div>
                   <h3 className="font-medium text-slate-900">{issue.title}</h3>
                   {project && <div className="text-xs text-slate-400 mt-1">{project.name} — {issue.runStep?.run?.flowVersion?.flow?.name}</div>}
-                  <div className="text-xs text-slate-400 mt-1 flex gap-3">
-                    <span>Door: {issue.createdBy.name}</span>
+                  <div className="text-xs text-slate-400 mt-1 flex gap-3 flex-wrap">
+                    <span>Door: {issue.createdBy?.name}</span>
                     <span>{formatDateTime(issue.createdAt)}</span>
-                    {issue._count?.comments > 0 && <span>{issue._count.comments} reactie{issue._count.comments !== 1 ? "s" : ""}</span>}
+                    <span className={sla.isOverdue ? "text-red-500 font-medium" : ""}>
+                      Open: {sla.ageLabel} {sla.isOverdue ? `(SLA: ${sla.slaDays}d)` : ""}
+                    </span>
+                    {(issue._count?.comments ?? 0) > 0 && <span>{issue._count!.comments} reactie{issue._count!.comments !== 1 ? "s" : ""}</span>}
                   </div>
                 </div>
                 <span className={`badge ${STATUS_COLORS[issue.status]} ml-4`}>{ISSUE_STATUS_LABELS[issue.status]}</span>

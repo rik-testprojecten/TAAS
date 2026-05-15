@@ -3,15 +3,16 @@ import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { STATUS_COLORS, PHASE_DESCRIPTIONS, formatDate } from "@/lib/utils";
+import type { Project, TestPhase, Flow } from "@/types";
 
-const PHASE_ORDER = ["FAT", "GAT", "PAT"];
+const PHASE_ORDER = ["FAT", "GAT", "PAT"] as const;
 
 export default function ProjectPage() {
   const { id } = useParams<{ id: string }>();
-  const [project, setProject] = useState<any>(null);
+  const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [showAddPhase, setShowAddPhase] = useState(false);
-  const [phaseForm, setPhaseForm] = useState({ name: "FAT", title: "", order: 0 });
+  const [phaseForm, setPhaseForm] = useState<{ name: string; title: string; order: number }>({ name: "FAT", title: "", order: 0 });
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<{ phaseId: string; label: string } | null>(null);
   const [confirmClose, setConfirmClose] = useState<{ phaseId: string; label: string } | null>(null);
@@ -76,11 +77,11 @@ export default function ProjectPage() {
     load();
   }
 
-  function phaseLabel(phase: any) {
+  function phaseLabel(phase: TestPhase) {
     return phase.title ? `${PHASE_DESCRIPTIONS[phase.name]} — ${phase.title}` : PHASE_DESCRIPTIONS[phase.name];
   }
 
-  function openEditDates(phase: any) {
+  function openEditDates(phase: TestPhase) {
     setEditDates({
       phaseId: phase.id,
       startDate: phase.startDate ? new Date(phase.startDate).toISOString().split("T")[0] : "",
@@ -198,13 +199,13 @@ export default function ProjectPage() {
           <div className="card p-12 text-center">
             <div className="text-slate-400 text-sm">Nog geen testfases. Voeg FAT, GAT of PAT toe.</div>
           </div>
-        ) : [...project.phases]
-            .sort((a: any, b: any) => {
-              const orderDiff = PHASE_ORDER.indexOf(a.name) - PHASE_ORDER.indexOf(b.name);
+        ) : [...(project.phases ?? [])]
+            .sort((a: TestPhase, b: TestPhase) => {
+              const orderDiff = PHASE_ORDER.indexOf(a.name as typeof PHASE_ORDER[number]) - PHASE_ORDER.indexOf(b.name as typeof PHASE_ORDER[number]);
               if (orderDiff !== 0) return orderDiff;
               return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
             })
-            .map((phase: any) => {
+            .map((phase: TestPhase) => {
               const progressPct = phase.stepTotal > 0
                 ? Math.round((phase.stepDone / phase.stepTotal) * 100)
                 : null;
@@ -298,7 +299,7 @@ export default function ProjectPage() {
                   {/* Flows preview */}
                   {phase.flows?.length > 0 && (
                     <div className="divide-y divide-slate-50">
-                      {phase.flows.slice(0, 3).map((flow: any) => {
+                      {phase.flows?.slice(0, 3).map((flow: Flow) => {
                         const latestVersion = flow.versions?.[0];
                         return (
                           <div key={flow.id} className="flex items-center justify-between px-5 py-3">

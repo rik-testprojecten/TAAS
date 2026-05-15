@@ -9,7 +9,7 @@ const PHASE_LABELS: Record<string, string> = {
 };
 
 export default function ReportsPage() {
-  const [projects, setProjects] = useState<any[]>([]);
+  const [projects, setProjects] = useState<import("@/types").Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -102,7 +102,7 @@ export default function ReportsPage() {
                 <div className="px-6 py-4 text-sm text-slate-400">Geen fases aangemaakt</div>
               ) : (
                 <div className="divide-y divide-slate-100">
-                  {project.phases.map((phase: any) => (
+                  {project.phases?.map((phase) => (
                     <div key={phase.id} className="px-6 py-5">
                       <div className="flex items-start gap-4">
                         {/* Phase info */}

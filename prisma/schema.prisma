@@ -492,3 +492,26 @@ model TemplateModuleLink {
 
   @@unique([templateId, moduleKey])
 }
+
+// ─── FASE CHECKLISTS ──────────────────────────────────────────────────────────
+
+model PhaseChecklist {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  phaseType PhaseType?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items PhaseChecklistItem[]
+}
+
+model PhaseChecklistItem {
+  id          String  @id @default(cuid())
+  checklistId String
+  order       Int
+  label       String
+  checked     Boolean @default(false)
+
+  checklist PhaseChecklist @relation(fields: [checklistId], references: [id], onDelete: Cascade)
+}

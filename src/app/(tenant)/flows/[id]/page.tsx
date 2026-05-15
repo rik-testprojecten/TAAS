@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 
@@ -159,6 +159,9 @@ export default function FlowBuilderPage() {
   const [metaForm, setMetaForm] = useState({ name: "", description: "" });
   const [savingMeta, setSavingMeta] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { load(); }, [id]);
 
@@ -267,6 +270,43 @@ export default function FlowBuilderPage() {
     setSaving(false);
   }
 
+  async function handleImport(file: File) {
+    if (!activeVersion) return;
+    setImporting(true);
+    setImportError(null);
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await fetch(`/api/flowVersions/${activeVersion.id}/import`, { method: "POST", body: fd });
+    const data = await res.json();
+    if (!res.ok) { setImportError(data.error ?? "Importfout"); } else { await load(); }
+    setImporting(false);
+  }
+
+  async function handleExport() {
+    if (!activeVersion) return;
+    const res = await fetch(`/api/flowVersions/${activeVersion.id}/export`);
+    if (!res.ok) return;
+    const blob = await res.blob();
+    const cd = res.headers.get("Content-Disposition") ?? "";
+    const match = cd.match(/filename="([^"]+)"/);
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = match?.[1] ?? "testscript.xlsx";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  async function downloadTemplate() {
+    if (!activeVersion) return;
+    const res = await fetch(`/api/flowVersions/${activeVersion.id}/export`, { method: "POST" });
+    const blob = await res.blob();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "testscript_sjabloon.xlsx";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
   function startInsert(pos: InsertPosition) {
     setInsertPos(pos);
     setNewStepForm(EMPTY_NEW_FORM);
@@ -365,31 +405,57 @@ export default function FlowBuilderPage() {
             </div>
           )}
         </div>
-        {!isClosed && (
-          <div className="flex gap-2 shrink-0">
-            {hasRuns && (
-              <button onClick={createNewVersion} className="btn-secondary text-sm">Nieuwe versie</button>
-            )}
-            {activeVersion && (
-              <Link
-                href={`/runs/new?versionId=${activeVersion.id}&flowName=${encodeURIComponent(flow.name)}`}
-                className="btn-primary text-sm"
-              >
-                Run starten
-              </Link>
-            )}
-            <button
-              onClick={() => setConfirmClose(true)}
-              title="Flow afsluiten"
-              className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded border border-slate-200"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </button>
-          </div>
-        )}
+        <div className="flex gap-2 shrink-0 flex-wrap">
+          {activeVersion && (
+            <>
+              <button onClick={handleExport} title="Exporteer stappen als Excel" className="btn-secondary text-sm flex items-center gap-1.5">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                Exporteren
+              </button>
+              {!isClosed && !hasRuns && (
+                <>
+                  <button onClick={() => importInputRef.current?.click()} disabled={importing} title="Importeer stappen uit Excel/CSV" className="btn-secondary text-sm flex items-center gap-1.5">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l4-4m0 0l4 4m-4-4v12" /></svg>
+                    {importing ? "Importeren..." : "Importeren"}
+                  </button>
+                  <button onClick={downloadTemplate} title="Download invulsjabloon" className="btn-secondary text-sm flex items-center gap-1.5 text-primary-600">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                    Sjabloon
+                  </button>
+                  <input ref={importInputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImport(f); e.target.value = ""; }} />
+                </>
+              )}
+            </>
+          )}
+          {!isClosed && (
+            <>
+              {hasRuns && (
+                <button onClick={createNewVersion} className="btn-secondary text-sm">Nieuwe versie</button>
+              )}
+              {activeVersion && (
+                <Link href={`/runs/new?versionId=${activeVersion.id}&flowName=${encodeURIComponent(flow.name)}`} className="btn-primary text-sm">
+                  Run starten
+                </Link>
+              )}
+              <button onClick={() => setConfirmClose(true)} title="Flow afsluiten" className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded border border-slate-200">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </button>
+            </>
+          )}
+        </div>
       </div>
+
+      {/* Import foutmelding */}
+      {importError && (
+        <div className="mb-4 bg-red-50 border border-red-200 rounded-xl p-3 flex items-center justify-between text-sm text-red-700">
+          <span>{importError}</span>
+          <button onClick={() => setImportError(null)} className="text-red-400 hover:text-red-600">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+      )}
 
       {/* Bevestiging flow afsluiten */}
       {confirmClose && (

@@ -14,7 +14,8 @@ export default function UsersPage() {
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNew, setShowNew] = useState(false);
-  const [form, setForm] = useState({ name: "", email: "", password: "", roles: ["TESTER"] as string[] });
+  const [form, setForm] = useState({ name: "", email: "", password: "", roles: ["TESTER"] as string[], sendInvite: true });
+  const [inviteResult, setInviteResult] = useState<{ sent: boolean } | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [emailDomain, setEmailDomain] = useState<string | null>(null);
@@ -46,8 +47,10 @@ export default function UsersPage() {
       body: JSON.stringify(form),
     });
     if (res.ok) {
+      const data = await res.json();
+      if (form.sendInvite) setInviteResult({ sent: data.inviteSent });
       setShowNew(false);
-      setForm({ name: "", email: "", password: "", roles: ["TESTER"] });
+      setForm({ name: "", email: "", password: "", roles: ["TESTER"], sendInvite: true });
       load();
     } else {
       const data = await res.json();
@@ -136,6 +139,18 @@ export default function UsersPage() {
                   ))}
                 </div>
               </div>
+              <div>
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.sendInvite}
+                    onChange={(e) => setForm({ ...form, sendInvite: e.target.checked })}
+                    className="rounded"
+                  />
+                  <span>Uitnodigings-e-mail versturen</span>
+                </label>
+                <p className="text-xs text-slate-400 mt-1 ml-6">Vereist dat SMTP is ingesteld in de omgevingsvariabelen.</p>
+              </div>
               {error && <div className="text-red-600 text-sm bg-red-50 px-3 py-2 rounded">{error}</div>}
               <div className="flex gap-3 pt-2">
                 <button type="submit" disabled={saving || form.roles.length === 0} className="btn-primary flex-1">{saving ? "Toevoegen..." : "Toevoegen"}</button>
@@ -143,6 +158,15 @@ export default function UsersPage() {
               </div>
             </form>
           </div>
+        </div>
+      )}
+
+      {inviteResult && (
+        <div className={`mb-4 p-4 rounded-xl border flex items-center justify-between text-sm ${inviteResult.sent ? "bg-green-50 border-green-200 text-green-800" : "bg-amber-50 border-amber-200 text-amber-800"}`}>
+          <span>{inviteResult.sent ? "Uitnodigings-e-mail verstuurd." : "Gebruiker aangemaakt, maar e-mail kon niet verstuurd worden. Controleer SMTP-instellingen."}</span>
+          <button onClick={() => setInviteResult(null)} className="ml-4 opacity-60 hover:opacity-100">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
         </div>
       )}
 
