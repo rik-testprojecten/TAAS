@@ -11,7 +11,7 @@ type Task = {
   title: string;
   createdAt: string;
   description?: string;
-  runStep?: { run?: { flowVersion?: { flow?: { phase?: { project?: { name: string } } } } }; name?: string } | null;
+  runStep?: { run?: { name?: string; flowVersion?: { flow?: { phase?: { project?: { name: string } } } } }; name?: string } | null;
   issue?: { id: string; title: string; impact?: string } | null;
 };
 
