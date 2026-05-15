@@ -17,10 +17,12 @@ export default function PhasePage() {
   const [showOverneemFAT, setShowOverneemFAT] = useState(false);
   const [showCopy, setShowCopy] = useState<{ flow: any } | null>(null);
   const [showFlowDates, setShowFlowDates] = useState<{ flow: any } | null>(null);
+  const [showPhaseDates, setShowPhaseDates] = useState(false);
   const [form, setForm] = useState({ name: "", description: "" });
   const [importForm, setImportForm] = useState({ name: "", templateVersionId: "" });
   const [copyForm, setCopyForm] = useState({ name: "", targetPhaseId: "" });
   const [flowDatesForm, setFlowDatesForm] = useState({ scheduledStart: "", scheduledEnd: "" });
+  const [phaseDatesForm, setPhaseDatesForm] = useState({ startDate: "", endDate: "" });
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<{ flowId: string; name: string } | null>(null);
   const [confirmClose, setConfirmClose] = useState<{ flowId: string; name: string } | null>(null);
@@ -132,6 +134,22 @@ export default function PhasePage() {
       }),
     });
     setShowFlowDates(null);
+    load();
+    setSaving(false);
+  }
+
+  async function savePhaseDates(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    await fetch(`/api/phases/${phaseId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        startDate: phaseDatesForm.startDate || null,
+        endDate: phaseDatesForm.endDate || null,
+      }),
+    });
+    setShowPhaseDates(false);
     load();
     setSaving(false);
   }
@@ -252,6 +270,46 @@ export default function PhasePage() {
   const canStop = phase.status === "ACTIVE";
   const now = new Date();
 
+  // Gantt data
+  type GanttColumn = { label: string; leftPct: number; widthPct: number };
+  let ganttData: null | { phaseStart: Date; phaseEnd: Date; phaseDurationMs: number; columns: GanttColumn[] } = null;
+  if (phase.startDate && phase.endDate) {
+    const phaseStart = new Date(phase.startDate);
+    const phaseEnd = new Date(phase.endDate);
+    const phaseDurationMs = phaseEnd.getTime() - phaseStart.getTime();
+    const phaseDays = phaseDurationMs / 86400000;
+    const columns: GanttColumn[] = [];
+    if (phaseDays <= 42) {
+      const startMonday = new Date(phaseStart);
+      startMonday.setDate(startMonday.getDate() - ((startMonday.getDay() + 6) % 7));
+      let cur = new Date(startMonday);
+      while (cur.getTime() <= phaseEnd.getTime()) {
+        const wStart = new Date(Math.max(cur.getTime(), phaseStart.getTime()));
+        const wEnd = new Date(Math.min(cur.getTime() + 6 * 86400000, phaseEnd.getTime()));
+        if (wStart <= wEnd) {
+          const lp = Math.max(0, ((wStart.getTime() - phaseStart.getTime()) / phaseDurationMs) * 100);
+          const wp = ((wEnd.getTime() - wStart.getTime() + 86400000) / phaseDurationMs) * 100;
+          columns.push({ label: wStart.toLocaleDateString("nl-NL", { day: "numeric", month: "short" }), leftPct: lp, widthPct: Math.min(wp, 100 - lp) });
+        }
+        cur.setDate(cur.getDate() + 7);
+      }
+    } else {
+      let cur = new Date(phaseStart.getFullYear(), phaseStart.getMonth(), 1);
+      while (cur.getTime() <= phaseEnd.getTime()) {
+        const mStart = new Date(Math.max(cur.getTime(), phaseStart.getTime()));
+        const nextMonth = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
+        const mEnd = new Date(Math.min(nextMonth.getTime() - 86400000, phaseEnd.getTime()));
+        if (mStart <= mEnd) {
+          const lp = Math.max(0, ((mStart.getTime() - phaseStart.getTime()) / phaseDurationMs) * 100);
+          const wp = ((mEnd.getTime() - mStart.getTime() + 86400000) / phaseDurationMs) * 100;
+          columns.push({ label: cur.toLocaleDateString("nl-NL", { month: "short" }), leftPct: lp, widthPct: Math.min(wp, 100 - lp) });
+        }
+        cur = nextMonth;
+      }
+    }
+    ganttData = { phaseStart, phaseEnd, phaseDurationMs, columns };
+  }
+
   return (
     <div className="p-8">
       <div className="flex items-center gap-2 text-sm text-slate-400 mb-6">
@@ -272,13 +330,29 @@ export default function PhasePage() {
               <h1 className="text-2xl font-bold text-slate-900">{PHASE_DESCRIPTIONS[phase.name]}{phase.title ? ` — ${phase.title}` : ""}</h1>
               <div className="flex items-center gap-3 mt-1">
                 <span className={`badge ${STATUS_COLORS[phase.status]}`}>{phase.status}</span>
-                {(phase.startDate || phase.endDate) && (
-                  <span className="text-xs text-slate-500">
-                    {phase.startDate && new Date(phase.startDate).toLocaleDateString("nl-NL")}
-                    {phase.startDate && phase.endDate && " → "}
-                    {phase.endDate && new Date(phase.endDate).toLocaleDateString("nl-NL")}
-                  </span>
-                )}
+                <button
+                  onClick={() => {
+                    setPhaseDatesForm({
+                      startDate: phase.startDate ? new Date(phase.startDate).toISOString().split("T")[0] : "",
+                      endDate: phase.endDate ? new Date(phase.endDate).toISOString().split("T")[0] : "",
+                    });
+                    setShowPhaseDates(true);
+                  }}
+                  className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-primary-600 group"
+                >
+                  {(phase.startDate || phase.endDate) ? (
+                    <>
+                      {phase.startDate && new Date(phase.startDate).toLocaleDateString("nl-NL")}
+                      {phase.startDate && phase.endDate && " → "}
+                      {phase.endDate && new Date(phase.endDate).toLocaleDateString("nl-NL")}
+                    </>
+                  ) : (
+                    <span className="text-slate-400">Datums instellen</span>
+                  )}
+                  <svg className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                </button>
               </div>
             </div>
           </div>
@@ -359,6 +433,69 @@ export default function PhasePage() {
       </div>
 
       {/* ── FLOWS TAB ── */}
+      {activeTab === "flows" && ganttData && phase.flows.length > 0 && (
+        <div className="card mb-4 overflow-hidden">
+          {/* Column header row */}
+          <div className="flex border-b border-slate-100 bg-slate-50">
+            <div className="w-44 shrink-0 px-4 py-2">
+              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Balkenplanning</span>
+            </div>
+            <div className="flex-1 relative h-8 overflow-hidden">
+              {ganttData.columns.map((col, i) => (
+                <div
+                  key={i}
+                  className="absolute top-0 h-full flex items-center justify-center border-l border-slate-200 first:border-l-0"
+                  style={{ left: `${col.leftPct}%`, width: `${col.widthPct}%` }}
+                >
+                  <span className="text-xs text-slate-400 font-medium truncate px-1">{col.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          {/* Flow rows */}
+          {phase.flows.map((flow: any) => {
+            const isClosed = flow.status === "CLOSED";
+            const hasStart = !!flow.scheduledStart;
+            const hasEnd = !!flow.scheduledEnd;
+            let barLeft = 0;
+            let barWidth = 0;
+            if (hasStart || hasEnd) {
+              const fStart = hasStart
+                ? Math.max(new Date(flow.scheduledStart).getTime(), ganttData!.phaseStart.getTime())
+                : ganttData!.phaseStart.getTime();
+              const fEnd = hasEnd
+                ? Math.min(new Date(flow.scheduledEnd).getTime(), ganttData!.phaseEnd.getTime())
+                : ganttData!.phaseEnd.getTime();
+              barLeft = Math.max(0, ((fStart - ganttData!.phaseStart.getTime()) / ganttData!.phaseDurationMs) * 100);
+              barWidth = Math.max(1.5, ((fEnd - fStart) / ganttData!.phaseDurationMs) * 100);
+            }
+            const hasSchedule = hasStart || hasEnd;
+            return (
+              <div key={flow.id} className="flex items-center border-b border-slate-50 last:border-0">
+                <div className="w-44 shrink-0 px-4 py-2.5">
+                  <span className={`text-sm font-medium truncate block ${isClosed ? "text-slate-400" : "text-slate-700"}`}>
+                    {flow.name}
+                  </span>
+                </div>
+                <div className="flex-1 px-4 py-2.5">
+                  <div className="relative h-6 rounded-full overflow-hidden bg-primary-50">
+                    {ganttData!.columns.map((col, i) => i > 0 && (
+                      <div key={i} className="absolute top-0 h-full w-px bg-white" style={{ left: `${col.leftPct}%` }} />
+                    ))}
+                    {hasSchedule && (
+                      <div
+                        className={`absolute top-0 h-full rounded-full ${isClosed ? "bg-slate-300" : "bg-primary-500"}`}
+                        style={{ left: `${barLeft}%`, width: `${barWidth}%` }}
+                      />
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {activeTab === "flows" && (
         <div className="grid gap-4">
           {phase.flows.length === 0 ? (
@@ -735,6 +872,30 @@ export default function PhasePage() {
               <div className="flex gap-3 pt-2">
                 <button type="submit" disabled={saving} className="btn-primary flex-1">{saving ? "Aanmaken..." : "Aanmaken"}</button>
                 <button type="button" onClick={() => setShowNewFlow(false)} className="btn-secondary flex-1">Annuleren</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Fase datums modal */}
+      {showPhaseDates && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md">
+            <h2 className="font-semibold text-lg mb-1">Fase planning</h2>
+            <p className="text-slate-500 text-sm mb-4">Stel de looptijd van de fase in. Dit bepaalt de schaal van de balkenplanning.</p>
+            <form onSubmit={savePhaseDates} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Startdatum</label>
+                <input type="date" className="input" value={phaseDatesForm.startDate} onChange={e => setPhaseDatesForm({ ...phaseDatesForm, startDate: e.target.value })} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Einddatum</label>
+                <input type="date" className="input" value={phaseDatesForm.endDate} onChange={e => setPhaseDatesForm({ ...phaseDatesForm, endDate: e.target.value })} />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button type="submit" disabled={saving} className="btn-primary flex-1">{saving ? "Opslaan..." : "Opslaan"}</button>
+                <button type="button" onClick={() => setShowPhaseDates(false)} className="btn-secondary flex-1">Annuleren</button>
               </div>
             </form>
           </div>
