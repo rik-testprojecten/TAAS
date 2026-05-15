@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { STATUS_COLORS, IMPACT_COLORS, ISSUE_TYPE_LABELS, ISSUE_IMPACT_LABELS, ISSUE_STATUS_LABELS, formatDateTime } from "@/lib/utils";
+import { AttachmentList } from "@/components/AttachmentUploader";
 
 export default function IssuePage() {
   const { id } = useParams<{ id: string }>();
@@ -176,6 +177,13 @@ export default function IssuePage() {
         <div className="text-sm text-slate-700 whitespace-pre-wrap bg-slate-50 rounded-lg p-3 mb-4">
           {issue.description}
         </div>
+
+        {issue.attachments?.length > 0 && (
+          <div className="mb-4">
+            <div className="text-xs font-medium text-slate-500 mb-2">Bijlagen</div>
+            <AttachmentList attachments={issue.attachments} />
+          </div>
+        )}
 
         <div className="flex items-center gap-4 text-xs text-slate-400">
           <span>Door: {issue.createdBy.name}</span>

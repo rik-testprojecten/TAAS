@@ -280,10 +280,11 @@ model RunStep {
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
 
-  run       TestRun          @relation(fields: [runId], references: [id], onDelete: Cascade)
-  assignees RunStepAssignee[]
-  issues    Issue[]
-  tasks     Task[]
+  run         TestRun          @relation(fields: [runId], references: [id], onDelete: Cascade)
+  assignees   RunStepAssignee[]
+  issues      Issue[]
+  tasks       Task[]
+  attachments Attachment[]
 }
 
 enum StepStatus {
@@ -327,11 +328,11 @@ model Issue {
   createdAt           DateTime    @default(now())
   updatedAt           DateTime    @updatedAt
 
-  runStep    RunStep        @relation(fields: [runStepId], references: [id], onDelete: Cascade)
-  createdBy  TenantUser     @relation("IssueCreator", fields: [createdById], references: [id])
-  comments   IssueComment[]
-  attachments IssueAttachment[]
-  tasks      Task[]
+  runStep     RunStep        @relation(fields: [runStepId], references: [id], onDelete: Cascade)
+  createdBy   TenantUser     @relation("IssueCreator", fields: [createdById], references: [id])
+  comments    IssueComment[]
+  attachments Attachment[]
+  tasks       Task[]
 }
 
 enum IssueType {
@@ -368,15 +369,19 @@ model IssueComment {
   user  TenantUser @relation(fields: [userId], references: [id])
 }
 
-model IssueAttachment {
+model Attachment {
   id        String   @id @default(cuid())
-  issueId   String
   tenantId  String
-  name      String
-  url       String
+  fileName  String
+  mimeType  String
+  sizeBytes Int
+  data      String   @db.Text
+  issueId   String?
+  runStepId String?
   createdAt DateTime @default(now())
 
-  issue Issue @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  issue   Issue?   @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  runStep RunStep? @relation(fields: [runStepId], references: [id], onDelete: Cascade)
 }
 
 model Task {

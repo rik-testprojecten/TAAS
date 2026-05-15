@@ -1,8 +1,9 @@
 "use client";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { cn } from "@/lib/utils";
+import { useState, useRef } from "react";
 
 type NavItem = { href: string; label: string; icon: React.ReactNode };
 
@@ -36,10 +37,49 @@ export function TenantSidebar({
   tenantName?: string;
   logoBase64?: string | null;
 }) {
+  const router = useRouter();
   const isAdmin = roles.includes("TENANT_ADMIN");
   const isScriptWriter = roles.includes("SCRIPT_WRITER");
   const isTester = roles.includes("TESTER");
   const isFM = roles.includes("FUNCTIONAL_MANAGER");
+
+  const [showSettings, setShowSettings] = useState(false);
+  const [settingsForm, setSettingsForm] = useState({ orgName: tenantName || "", logoBase64: logoBase64 || "" });
+  const [settingsSaving, setSettingsSaving] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+
+  async function compressLogo(file: File): Promise<string> {
+    return new Promise((resolve) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        const MAX = 200;
+        const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(url);
+        resolve(canvas.toDataURL("image/png"));
+      };
+      img.src = url;
+    });
+  }
+
+  async function saveSettings() {
+    setSettingsSaving(true);
+    await fetch("/api/settings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        orgName: settingsForm.orgName,
+        logoBase64: settingsForm.logoBase64 || null,
+      }),
+    });
+    setSettingsSaving(false);
+    setShowSettings(false);
+    router.refresh();
+  }
 
   const commonItems: NavItem[] = [
     {
@@ -103,25 +143,114 @@ export function TenantSidebar({
 
   return (
     <aside className="fixed left-0 top-0 h-full w-60 bg-forest-700 flex flex-col z-10">
-      {/* Logo */}
-      <div className="px-4 py-5 border-b border-forest-900">
+      {/* Logo — clickable for admins */}
+      <div
+        className={`px-4 py-5 border-b border-forest-900 ${isAdmin ? "cursor-pointer hover:bg-forest-600 transition-colors group" : ""}`}
+        onClick={isAdmin ? () => { setSettingsForm({ orgName: tenantName || "", logoBase64: logoBase64 || "" }); setShowSettings(true); } : undefined}
+        title={isAdmin ? "Naam en logo wijzigen" : undefined}
+      >
         <div className="flex items-center gap-2">
           {logoBase64 ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={logoBase64} alt="Logo" className="w-8 h-8 rounded-lg object-contain bg-white" />
           ) : (
-            <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
+            <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center group-hover:bg-primary-500 transition-colors">
               <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
               </svg>
             </div>
           )}
-          <div>
-            <div className="text-white font-bold text-sm">{tenantName || "TAAS"}</div>
-            {tenantName && <div className="text-forest-300 text-xs truncate max-w-[140px]">Testbeheer</div>}
+          <div className="flex-1 min-w-0">
+            <div className="text-white font-bold text-sm truncate">{tenantName || "TAAS"}</div>
+            {tenantName && <div className="text-forest-300 text-xs truncate">Testbeheer</div>}
           </div>
+          {isAdmin && (
+            <svg className="w-3.5 h-3.5 text-forest-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+            </svg>
+          )}
         </div>
       </div>
+
+      {/* Settings modal */}
+      {showSettings && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowSettings(false)} />
+          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold text-slate-800">Naam en logo</h2>
+              <button onClick={() => setShowSettings(false)} className="text-slate-400 hover:text-slate-600">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Organisatienaam</label>
+              <input
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300"
+                value={settingsForm.orgName}
+                onChange={(e) => setSettingsForm({ ...settingsForm, orgName: e.target.value })}
+                placeholder="Organisatienaam"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Logo</label>
+              <div className="flex items-center gap-3">
+                {settingsForm.logoBase64 ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={settingsForm.logoBase64} alt="Logo preview" className="w-14 h-14 rounded-lg object-contain border border-slate-200 bg-slate-50 p-1" />
+                ) : (
+                  <div className="w-14 h-14 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 text-xs border border-slate-200">Geen</div>
+                )}
+                <div className="space-y-1.5">
+                  <button
+                    type="button"
+                    onClick={() => logoInputRef.current?.click()}
+                    className="text-sm text-primary-600 border border-primary-200 px-3 py-1.5 rounded-lg hover:bg-primary-50 transition-colors block w-full text-center"
+                  >
+                    Logo uploaden
+                  </button>
+                  {settingsForm.logoBase64 && (
+                    <button
+                      type="button"
+                      onClick={() => setSettingsForm({ ...settingsForm, logoBase64: "" })}
+                      className="text-xs text-red-500 hover:text-red-700 block w-full text-center"
+                    >
+                      Logo verwijderen
+                    </button>
+                  )}
+                </div>
+              </div>
+              <input
+                ref={logoInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const b64 = await compressLogo(file);
+                  setSettingsForm({ ...settingsForm, logoBase64: b64 });
+                  e.target.value = "";
+                }}
+              />
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={saveSettings}
+                disabled={settingsSaving}
+                className="flex-1 bg-primary-600 text-white text-sm font-medium py-2 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
+              >
+                {settingsSaving ? "Opslaan..." : "Opslaan"}
+              </button>
+              <button onClick={() => setShowSettings(false)} className="flex-1 border border-slate-200 text-slate-600 text-sm py-2 rounded-lg hover:bg-slate-50 transition-colors">
+                Annuleren
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">

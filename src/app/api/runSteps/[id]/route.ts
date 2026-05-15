@@ -66,7 +66,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const { id } = await params;
 
   const body = await req.json();
-  const parsed = updateSchema.safeParse(body);
+  const { attachmentIds, ...rest } = body;
+  const parsed = updateSchema.safeParse(rest);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
   const step = await prisma.runStep.findFirst({
@@ -159,6 +160,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         data: { status: "DONE" },
       });
     }
+  }
+
+  if (Array.isArray(attachmentIds) && attachmentIds.length > 0) {
+    await prisma.attachment.updateMany({
+      where: { id: { in: attachmentIds }, tenantId, runStepId: null },
+      data: { runStepId: id },
+    });
   }
 
   await logAudit(tenantId, user.id, "STEP_RESULT", "RunStep", id, { prevStatus: step.status }, parsed.data);

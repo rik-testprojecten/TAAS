@@ -38,13 +38,21 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!step) return NextResponse.json({ error: "Step not found" }, { status: 404 });
 
   const body = await req.json();
-  const parsed = createSchema.safeParse(body);
+  const { attachmentIds, ...rest } = body;
+  const parsed = createSchema.safeParse(rest);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
   const issue = await prisma.issue.create({
     data: { ...parsed.data, runStepId: id, tenantId, createdById: user.id },
     include: { createdBy: { select: { id: true, name: true } } },
   });
+
+  if (Array.isArray(attachmentIds) && attachmentIds.length > 0) {
+    await prisma.attachment.updateMany({
+      where: { id: { in: attachmentIds }, tenantId, issueId: null },
+      data: { issueId: issue.id },
+    });
+  }
 
   await logAudit(tenantId, user.id, "CREATE", "Issue", issue.id, null, parsed.data);
 

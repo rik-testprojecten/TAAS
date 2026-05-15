@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { STATUS_COLORS, IMPACT_COLORS, ISSUE_TYPE_LABELS, ISSUE_IMPACT_LABELS, formatDateTime } from "@/lib/utils";
+import { AttachmentUploader, type AttachmentMeta } from "@/components/AttachmentUploader";
 
 export default function TaskDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -17,7 +18,9 @@ export default function TaskDetailPage() {
 
   const [showIssueForm, setShowIssueForm] = useState(false);
   const [issueForm, setIssueForm] = useState({ title: "", description: "", type: "BUG", impact: "MEDIUM" });
+  const [issueAttachments, setIssueAttachments] = useState<AttachmentMeta[]>([]);
   const [issueSuccess, setIssueSuccess] = useState(false);
+  const [resultAttachments, setResultAttachments] = useState<AttachmentMeta[]>([]);
 
   useEffect(() => { load(); }, [id]);
 
@@ -34,7 +37,7 @@ export default function TaskDetailPage() {
     await fetch(`/api/runSteps/${task.runStep.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(resultForm),
+      body: JSON.stringify({ ...resultForm, attachmentIds: resultAttachments.map((a) => a.id) }),
     });
     setSaving(false);
     router.push("/tasks");
@@ -46,11 +49,12 @@ export default function TaskDetailPage() {
     const res = await fetch(`/api/runSteps/${task.runStep.id}/issues`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(issueForm),
+      body: JSON.stringify({ ...issueForm, attachmentIds: issueAttachments.map((a) => a.id) }),
     });
     setSaving(false);
     if (res.ok) {
       setIssueForm({ title: "", description: "", type: "BUG", impact: "MEDIUM" });
+      setIssueAttachments([]);
       setShowIssueForm(false);
       setIssueSuccess(true);
       setTimeout(() => setIssueSuccess(false), 4000);
@@ -187,6 +191,10 @@ export default function TaskDetailPage() {
                   <option value="LOW">Laag</option>
                 </select>
               </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1.5">Bijlagen</label>
+                <AttachmentUploader value={issueAttachments} onChange={setIssueAttachments} />
+              </div>
               <div className="flex gap-2">
                 <button
                   onClick={submitIssue}
@@ -247,6 +255,10 @@ export default function TaskDetailPage() {
                 value={resultForm.notes}
                 onChange={(e) => setResultForm({ ...resultForm, notes: e.target.value })}
               />
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1.5">Bijlagen</label>
+                <AttachmentUploader value={resultAttachments} onChange={setResultAttachments} />
+              </div>
               <div className="flex gap-2">
                 <button onClick={submitResult} disabled={saving} className="btn-primary">
                   {saving ? "Opslaan..." : "Opslaan en terug"}
