@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { STATUS_COLORS, IMPACT_COLORS, ISSUE_TYPE_LABELS, ISSUE_IMPACT_LABELS, ISSUE_STATUS_LABELS, RUN_STATUS_LABELS, STEP_STATUS_LABELS, formatDateTime } from "@/lib/utils";
+import { AttachmentList } from "@/components/AttachmentUploader";
 
 export default function RunPage() {
   const { id } = useParams<{ id: string }>();
@@ -82,6 +83,14 @@ export default function RunPage() {
 
   // Map voor snelle lookup per id
   const stepsById: Record<string, any> = Object.fromEntries(run.steps.map((s: any) => [s.id, s]));
+
+  // FlowStep bijlagen per order (voor download door tester)
+  const flowStepAttachmentsByOrder: Record<number, any[]> = {};
+  for (const fs of (run.flowVersion?.steps ?? [])) {
+    if (fs.attachments?.length > 0) {
+      flowStepAttachmentsByOrder[fs.order] = fs.attachments;
+    }
+  }
 
   // Primaire stappen (geen parent) voor unlocking-check
   const primaryStepsSorted: any[] = sortedSteps.filter((s: any) => !s.parentRunStepId);
@@ -226,6 +235,12 @@ export default function RunPage() {
                           <div className="mt-2 p-2 bg-blue-50 rounded text-sm">
                             <span className="font-medium text-blue-700">Verwacht: </span>
                             <span className="text-blue-600">{step.expectedResult}</span>
+                          </div>
+                        )}
+                        {flowStepAttachmentsByOrder[step.order]?.length > 0 && (
+                          <div className="mt-2">
+                            <p className="text-xs font-medium text-slate-500 mb-1">Bijlagen van script</p>
+                            <AttachmentList attachments={flowStepAttachmentsByOrder[step.order]} />
                           </div>
                         )}
                       </div>

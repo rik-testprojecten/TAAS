@@ -92,6 +92,13 @@ export const TASK_TYPE_LABELS: Record<string, string> = {
   QUESTION: "Vraag beantwoorden",
 };
 
+export const TENANT_ROLE_LABELS: Record<string, string> = {
+  TENANT_ADMIN: "Beheerder",
+  SCRIPT_WRITER: "Scriptschrijver",
+  TESTER: "Tester",
+  FUNCTIONAL_MANAGER: "Functioneel Beheerder",
+};
+
 export const PROJECT_STATUS_LABELS: Record<string, string> = {
   ACTIVE: "Actief",
   COMPLETED: "Afgerond",

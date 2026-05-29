@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { cn } from "@/lib/utils";
+import { cn, TENANT_ROLE_LABELS } from "@/lib/utils";
 import { useState, useRef, useEffect, useCallback } from "react";
 
 type NavItem = { href: string; label: string; icon: React.ReactNode };
@@ -324,7 +324,7 @@ function SidebarContent({
           </div>
           <div className="min-w-0">
             <div className="text-white text-sm font-medium truncate">{userName}</div>
-            <div className="text-forest-300 text-xs">{roles[0]?.replace("_", " ")}</div>
+            <div className="text-forest-300 text-xs">{roles[0] ? (TENANT_ROLE_LABELS[roles[0]] ?? roles[0]) : ""}</div>
           </div>
         </div>
         <button

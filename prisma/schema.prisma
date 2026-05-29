@@ -224,6 +224,7 @@ model FlowStep {
 
   flowVersion FlowVersion        @relation(fields: [flowVersionId], references: [id], onDelete: Cascade)
   assignees   FlowStepAssignee[]
+  attachments Attachment[]
 }
 
 model FlowStepAssignee {
@@ -374,18 +375,20 @@ model IssueComment {
 }
 
 model Attachment {
-  id        String   @id @default(cuid())
-  tenantId  String
-  fileName  String
-  mimeType  String
-  sizeBytes Int
-  data      String   @db.Text
-  issueId   String?
-  runStepId String?
-  createdAt DateTime @default(now())
+  id          String   @id @default(cuid())
+  tenantId    String
+  fileName    String
+  mimeType    String
+  sizeBytes   Int
+  data        String   @db.Text
+  issueId     String?
+  runStepId   String?
+  flowStepId  String?
+  createdAt   DateTime @default(now())
 
-  issue   Issue?   @relation(fields: [issueId], references: [id], onDelete: Cascade)
-  runStep RunStep? @relation(fields: [runStepId], references: [id], onDelete: Cascade)
+  issue    Issue?    @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  runStep  RunStep?  @relation(fields: [runStepId], references: [id], onDelete: Cascade)
+  flowStep FlowStep? @relation(fields: [flowStepId], references: [id], onDelete: Cascade)
 }
 
 model Task {

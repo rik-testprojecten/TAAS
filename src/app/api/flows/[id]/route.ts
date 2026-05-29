@@ -21,6 +21,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
             orderBy: { order: "asc" },
             include: {
               assignees: { include: { user: { select: { id: true, name: true } } } },
+              attachments: { select: { id: true, fileName: true, sizeBytes: true } },
             },
           },
           _count: { select: { runs: true } },

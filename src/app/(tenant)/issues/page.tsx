@@ -13,16 +13,19 @@ type SortDir = "asc" | "desc";
 export default function IssuesPage() {
   const [issues, setIssues] = useState<Issue[]>([]);
   const [loading, setLoading] = useState(true);
+  const [view, setView] = useState<"all" | "wishlist">("all");
   const [filters, setFilters] = useState({ status: "", type: "", impact: "" });
   const [sortField, setSortField] = useState<SortField>("createdAt");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
-  useEffect(() => { load(); }, [filters]);
+  useEffect(() => { load(); }, [filters, view]);
 
   async function load() {
     const params = new URLSearchParams();
     if (filters.status) params.set("status", filters.status);
-    if (filters.type) params.set("type", filters.type);
+    // In de wenslijst-weergave forceren we type WISH; anders het gekozen typefilter
+    if (view === "wishlist") params.set("type", "WISH");
+    else if (filters.type) params.set("type", filters.type);
     if (filters.impact) params.set("impact", filters.impact);
     const res = await fetch(`/api/issues?${params}`);
     const data = await res.json();
@@ -67,11 +70,38 @@ export default function IssuesPage() {
 
   return (
     <div className="p-4 md:p-8">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Bevindingen</h1>
-          <p className="text-slate-500 text-sm mt-1">{issues.length} bevinding{issues.length !== 1 ? "en" : ""}</p>
+          <h1 className="text-2xl font-bold text-slate-900">{view === "wishlist" ? "Wenslijst" : "Bevindingen"}</h1>
+          <p className="text-slate-500 text-sm mt-1">
+            {view === "wishlist"
+              ? `${issues.length} wens${issues.length !== 1 ? "en" : ""}`
+              : `${issues.length} bevinding${issues.length !== 1 ? "en" : ""}`}
+          </p>
         </div>
+      </div>
+
+      {/* Weergave-tabs: alle bevindingen vs. wenslijst */}
+      <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 mb-5">
+        <button
+          onClick={() => setView("all")}
+          className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
+            view === "all" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
+          }`}
+        >
+          Alle bevindingen
+        </button>
+        <button
+          onClick={() => setView("wishlist")}
+          className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors flex items-center gap-1.5 ${
+            view === "wishlist" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
+          }`}
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+          </svg>
+          Wenslijst
+        </button>
       </div>
 
       {(criticalCount > 0 || blockerCount > 0) && (
@@ -91,12 +121,14 @@ export default function IssuesPage() {
           <option value="RESOLVED">Opgelost</option>
           <option value="REJECTED">Afgewezen</option>
         </select>
-        <select className="input w-auto text-sm" value={filters.type} onChange={e => setFilters({...filters, type: e.target.value})}>
-          <option value="">Alle typen</option>
-          <option value="BUG">Fout</option>
-          <option value="WISH">Wens</option>
-          <option value="BLOCKER">Blokkade</option>
-        </select>
+        {view !== "wishlist" && (
+          <select className="input w-auto text-sm" value={filters.type} onChange={e => setFilters({...filters, type: e.target.value})}>
+            <option value="">Alle typen</option>
+            <option value="BUG">Fout</option>
+            <option value="WISH">Wens</option>
+            <option value="BLOCKER">Blokkade</option>
+          </select>
+        )}
         <select className="input w-auto text-sm" value={filters.impact} onChange={e => setFilters({...filters, impact: e.target.value})}>
           <option value="">Alle impacts</option>
           <option value="CRITICAL">Kritiek</option>
@@ -131,9 +163,11 @@ export default function IssuesPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
-            <p className="text-slate-700 font-medium">Geen bevindingen gevonden</p>
+            <p className="text-slate-700 font-medium">{view === "wishlist" ? "Geen wensen gevonden" : "Geen bevindingen gevonden"}</p>
             <p className="text-slate-400 text-sm mt-1">
-              {(filters.status || filters.type || filters.impact) ? "Probeer andere filteropties." : "Er zijn nog geen bevindingen geregistreerd."}
+              {view === "wishlist"
+                ? "Er staan nog geen wensen op de wenslijst. Zet een bevinding op de wenslijst door het type op 'Wens' te zetten."
+                : (filters.status || filters.type || filters.impact) ? "Probeer andere filteropties." : "Er zijn nog geen bevindingen geregistreerd."}
             </p>
           </div>
         ) : sorted.map((issue) => {
