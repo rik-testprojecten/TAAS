@@ -1,13 +1,29 @@
 import { PrismaClient, PlatformRole, TenantRole, TemplateCategory } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { randomBytes } from "crypto";
 
 const prisma = new PrismaClient();
 
+// Resolve a seed password from an env var, or generate a strong random one.
+// Plaintext is never printed; generated passwords must be reset via the
+// "wachtwoord vergeten / instellen" flow or shared through a secure channel.
+function seedPassword(envVar: string): string {
+  const fromEnv = process.env[envVar];
+  if (fromEnv && fromEnv.length >= 8) return fromEnv;
+  return randomBytes(18).toString("base64url");
+}
+
 async function main() {
+  if (process.env.NODE_ENV === "production" && process.env.ALLOW_PROD_SEED !== "true") {
+    throw new Error(
+      "Refusing to seed demo data in production. Set ALLOW_PROD_SEED=true to override.",
+    );
+  }
+
   console.log("Seeding database...");
 
   // SuperAdmin
-  const superAdminPassword = await bcrypt.hash("Admin123!", 10);
+  const superAdminPassword = await bcrypt.hash(seedPassword("SEED_SUPERADMIN_PASSWORD"), 10);
   await prisma.platformUser.upsert({
     where: { email: "admin@rhoost.nl" },
     update: {},
@@ -30,7 +46,7 @@ async function main() {
   });
 
   // TenantAdmin
-  const adminPassword = await bcrypt.hash("Tenant123!", 10);
+  const adminPassword = await bcrypt.hash(seedPassword("SEED_TENANTADMIN_PASSWORD"), 10);
   await prisma.tenantUser.upsert({
     where: { tenantId_email: { tenantId: tenant.id, email: "admin@demo-gemeente.nl" } },
     update: {},
@@ -44,7 +60,7 @@ async function main() {
   });
 
   // Tester user
-  const testerPassword = await bcrypt.hash("Tester123!", 10);
+  const testerPassword = await bcrypt.hash(seedPassword("SEED_TESTER_PASSWORD"), 10);
   await prisma.tenantUser.upsert({
     where: { tenantId_email: { tenantId: tenant.id, email: "tester@demo-gemeente.nl" } },
     update: {},
@@ -58,7 +74,7 @@ async function main() {
   });
 
   // Functional Manager
-  const fbPassword = await bcrypt.hash("Manager123!", 10);
+  const fbPassword = await bcrypt.hash(seedPassword("SEED_MANAGER_PASSWORD"), 10);
   await prisma.tenantUser.upsert({
     where: { tenantId_email: { tenantId: tenant.id, email: "fb@demo-gemeente.nl" } },
     update: {},
@@ -173,10 +189,12 @@ async function main() {
   });
 
   console.log("Seed completed!");
-  console.log("Platform login: admin@rhoost.nl / Admin123!");
-  console.log("Tenant admin: admin@demo-gemeente.nl / Tenant123!");
-  console.log("Tester: tester@demo-gemeente.nl / Tester123!");
-  console.log("FB: fb@demo-gemeente.nl / Manager123!");
+  console.log("Accounts created (passwords come from SEED_*_PASSWORD env vars,");
+  console.log("or were randomly generated — reset them via the set-password flow):");
+  console.log("  Platform:     admin@rhoost.nl");
+  console.log("  Tenant admin: admin@demo-gemeente.nl");
+  console.log("  Tester:       tester@demo-gemeente.nl");
+  console.log("  Manager:      fb@demo-gemeente.nl");
 }
 
 main()

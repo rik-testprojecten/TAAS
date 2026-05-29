@@ -4,6 +4,8 @@ import { requireTenantAuth } from "@/lib/api-helpers";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { sendInviteMail } from "@/lib/mailer";
+import { createInviteToken } from "@/lib/invite-token";
+import { rateLimit } from "@/lib/rate-limit";
 
 const createSchema = z.object({
   name: z.string().min(2),
@@ -31,6 +33,9 @@ export async function POST(req: NextRequest) {
   if ("error" in result) return result.error;
   const { tenantId } = result.context;
 
+  const limited = rateLimit(req, { bucket: "user-create", windowMs: 60_000, max: 20 });
+  if (limited) return limited;
+
   const body = await req.json();
   const parsed = createSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -50,10 +55,12 @@ export async function POST(req: NextRequest) {
   if (sendInvite) {
     const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { name: true } });
     const settings = await prisma.tenantSettings.findUnique({ where: { tenantId }, select: { orgName: true } });
+    // Send a secure set-password link instead of the plaintext password.
+    const token = createInviteToken(user.id, user.email);
     inviteSent = await sendInviteMail({
       to: parsed.data.email,
       name: parsed.data.name,
-      tempPassword: parsed.data.password,
+      setPasswordToken: token,
       tenantName: settings?.orgName ?? tenant?.name ?? "TAAS",
     });
   }
