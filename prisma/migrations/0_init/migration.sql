@@ -4,19 +4,15 @@
 -- history), so the existing database already contains every object below but has
 -- no `_prisma_migrations` table.
 --
--- IMPORTANT: Before the first deploy, this baseline MUST be marked as already
--- applied against each existing database (production and any preview DB), ONCE:
---
---     DATABASE_URL=<url> npx prisma migrate resolve --applied 0_init
---
 -- `prisma migrate deploy` refuses to run against a non-empty database that has no
--- migration history (error P3005), so without this step the build will fail. See
--- prisma/migrations/README.md and https://pris.ly/d/migrate-baseline.
+-- migration history (error P3005). The deploy entrypoint (scripts/db-migrate-deploy.mjs)
+-- handles this automatically: on such a database it marks this baseline as already
+-- applied before deploying, so no manual step is needed. See prisma/migrations/README.md
+-- and https://pris.ly/d/migrate-baseline.
 --
--- Every CREATE below is also written idempotently (IF NOT EXISTS / pg_type /
--- pg_constraint guards) so that creating a brand-new database from these migrations
--- is safe and re-runnable. The guards do NOT remove the one-time baseline step above
--- for the existing database.
+-- Every CREATE below is written idempotently (IF NOT EXISTS / pg_type / pg_constraint
+-- guards) so that creating a brand-new database from these migrations is safe and
+-- re-runnable.
 
 -- CreateEnum
 DO $$ BEGIN
