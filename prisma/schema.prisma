@@ -265,26 +265,30 @@ enum RunStatus {
 }
 
 model RunStep {
-  id             String     @id @default(cuid())
-  runId          String
-  tenantId       String
-  order          Int
-  title          String
-  instruction    String
-  expectedResult String?
-  status         StepStatus @default(PENDING)
-  result         String?
-  notes          String?
-  doneById       String?
-  doneAt         DateTime?
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
+  id                String     @id @default(cuid())
+  runId             String
+  tenantId          String
+  order             Int
+  title             String
+  instruction       String
+  expectedResult    String?
+  status            StepStatus @default(PENDING)
+  result            String?
+  notes             String?
+  doneById          String?
+  doneAt            DateTime?
+  parentRunStepId   String?
+  threadInitiatorId String?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
 
-  run         TestRun          @relation(fields: [runId], references: [id], onDelete: Cascade)
-  assignees   RunStepAssignee[]
-  issues      Issue[]
-  tasks       Task[]
-  attachments Attachment[]
+  run           TestRun          @relation(fields: [runId], references: [id], onDelete: Cascade)
+  assignees     RunStepAssignee[]
+  issues        Issue[]
+  tasks         Task[]
+  attachments   Attachment[]
+  parentRunStep RunStep?         @relation("RunStepThread", fields: [parentRunStepId], references: [id])
+  threadedSteps RunStep[]        @relation("RunStepThread")
 }
 
 enum StepStatus {

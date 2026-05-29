@@ -72,10 +72,40 @@ export default function RunPage() {
   const totalSteps = run.steps.length;
   const progress = totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
 
-  function isStepUnlocked(index: number): boolean {
+  // Steps gesorteerd: primaire stappen op order, threads direct erna op hetzelfde order
+  const sortedSteps: any[] = [...run.steps].sort((a: any, b: any) => {
+    if (a.order !== b.order) return a.order - b.order;
+    if (!a.parentRunStepId && b.parentRunStepId) return -1;
+    if (a.parentRunStepId && !b.parentRunStepId) return 1;
+    return 0;
+  });
+
+  // Map voor snelle lookup per id
+  const stepsById: Record<string, any> = Object.fromEntries(run.steps.map((s: any) => [s.id, s]));
+
+  // Primaire stappen (geen parent) voor unlocking-check
+  const primaryStepsSorted: any[] = sortedSteps.filter((s: any) => !s.parentRunStepId);
+
+  // Bijhouden hoeveel instanties er zijn per order-niveau (voor "(instantie N)" labels)
+  const orderCounts: Record<number, number> = {};
+  const orderIndexOf: Record<string, number> = {};
+  for (const step of sortedSteps) {
+    orderCounts[step.order] = (orderCounts[step.order] ?? 0) + 1;
+    orderIndexOf[step.id] = orderCounts[step.order];
+  }
+
+  function isStepUnlocked(step: any): boolean {
     if (run.status !== "IN_PROGRESS") return false;
-    if (index === 0) return true;
-    return run.steps.slice(0, index).every((s: any) => ["PASSED", "FAILED", "BLOCKED"].includes(s.status));
+    if (step.parentRunStepId) {
+      // Thread-stap: geblokkeerd totdat de parent-stap terminal is
+      const parent = stepsById[step.parentRunStepId];
+      return parent ? ["PASSED", "FAILED", "BLOCKED"].includes(parent.status) : false;
+    } else {
+      // Primaire stap: geblokkeerd totdat alle vorige primaire stappen terminal zijn
+      const idx = primaryStepsSorted.findIndex((s: any) => s.id === step.id);
+      if (idx === 0) return true;
+      return ["PASSED", "FAILED", "BLOCKED"].includes(primaryStepsSorted[idx - 1].status);
+    }
   }
 
   function myCompletedThisStep(step: any): boolean {
@@ -89,8 +119,8 @@ export default function RunPage() {
     return step.assignees?.some((a: any) => a.user.id === currentUserId) ?? false;
   }
 
-  function canActOnStep(step: any, index: number): boolean {
-    if (!isStepUnlocked(index)) return false;
+  function canActOnStep(step: any): boolean {
+    if (!isStepUnlocked(step)) return false;
     if (["PASSED", "FAILED", "BLOCKED"].includes(step.status)) return false;
     // If step has assignees, only assignees can act (and only if they haven't completed yet)
     if (step.assignees?.length > 0) {
@@ -144,13 +174,16 @@ export default function RunPage() {
 
       {/* Steps */}
       <div className="space-y-3 max-w-3xl">
-        {run.steps.map((step: any, index: number) => {
-          const unlocked = isStepUnlocked(index);
+        {sortedSteps.map((step: any) => {
+          const unlocked = isStepUnlocked(step);
           const terminal = ["PASSED", "FAILED", "BLOCKED"].includes(step.status);
-          const canAct = canActOnStep(step, index);
+          const canAct = canActOnStep(step);
           const iAmAssignee = isAssignedToMe(step);
           const iDone = myCompletedThisStep(step);
           const hasAssignees = step.assignees?.length > 0;
+          const isThread = !!step.parentRunStepId;
+          const instanceCount = orderCounts[step.order] ?? 1;
+          const instanceIdx = orderIndexOf[step.id] ?? 1;
 
           return (
             <div
@@ -175,12 +208,19 @@ export default function RunPage() {
                     {step.status === "PASSED" ? "✓" :
                      step.status === "FAILED" ? "✗" :
                      step.status === "BLOCKED" ? "!" :
-                     !unlocked ? "🔒" : index + 1}
+                     !unlocked ? "🔒" : step.order}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between">
                       <div>
-                        <h4 className="font-medium text-slate-900">{step.title}</h4>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h4 className="font-medium text-slate-900">{step.title}</h4>
+                          {instanceCount > 1 && (
+                            <span className="text-xs px-1.5 py-0.5 rounded bg-violet-50 text-violet-600 border border-violet-200 shrink-0">
+                              instantie {instanceIdx}
+                            </span>
+                          )}
+                        </div>
                         <p className="text-sm text-slate-600 mt-1 whitespace-pre-wrap">{step.instruction}</p>
                         {step.expectedResult && (
                           <div className="mt-2 p-2 bg-blue-50 rounded text-sm">
