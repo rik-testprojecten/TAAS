@@ -1,5 +1,5 @@
 import { auth } from "./auth";
-import { NextResponse, type NextRequest, type NextFetchEvent } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 
 const authMiddleware = auth((req) => {
   const { pathname } = req.nextUrl;
@@ -28,9 +28,10 @@ const authMiddleware = auth((req) => {
   return NextResponse.next();
 });
 
-export default async function middleware(req: NextRequest, event: NextFetchEvent) {
+export default async function middleware(req: NextRequest) {
   try {
-    return await authMiddleware(req, event);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return await authMiddleware(req, {} as any);
   } catch {
     const { pathname } = req.nextUrl;
     if (pathname === "/login" || pathname.startsWith("/api/auth")) {
