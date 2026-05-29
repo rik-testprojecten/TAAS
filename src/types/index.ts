@@ -218,6 +218,8 @@ export type TenantUser = {
   name: string;
   roles: TenantRole[];
   isActive: boolean;
+  isBlocked: boolean;
+  mfaEnabled: boolean;
   createdAt: string;
   updatedAt: string;
 };

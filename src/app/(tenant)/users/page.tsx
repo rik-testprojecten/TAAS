@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
 import { HelpButton } from "@/components/HelpButton";
 
 const ROLE_LABELS: Record<string, string> = {
@@ -12,6 +13,8 @@ const ROLE_LABELS: Record<string, string> = {
 const ALL_ROLES = Object.keys(ROLE_LABELS);
 
 export default function UsersPage() {
+  const { data: session } = useSession();
+  const currentUserId = session?.user?.id;
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNew, setShowNew] = useState(false);
@@ -63,13 +66,23 @@ export default function UsersPage() {
     setSaving(false);
   }
 
-  async function toggleActive(userId: string, isActive: boolean) {
+  async function toggleBlocked(userId: string, isBlocked: boolean) {
     try {
       await fetch(`/api/users/${userId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isActive: !isActive }),
+        body: JSON.stringify({ isBlocked: !isBlocked }),
       });
+    } catch {
+      // Fout negeren, herlaad altijd
+    }
+    await load();
+  }
+
+  async function removeUser(userId: string, name: string) {
+    if (!confirm(`${name} verwijderen? De gebruiker kan daarna niet meer inloggen.`)) return;
+    try {
+      await fetch(`/api/users/${userId}`, { method: "DELETE" });
     } catch {
       // Fout negeren, herlaad altijd
     }
@@ -201,13 +214,21 @@ export default function UsersPage() {
       <div className="card">
         <div className="divide-y divide-slate-100">
           {users.map((user) => (
-            <div key={user.id} className="flex items-center justify-between p-4">
+            <div key={user.id} className={`flex items-center justify-between p-4 ${user.isBlocked ? "bg-red-50/40" : ""}`}>
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center text-primary-700 font-medium text-sm">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-medium text-sm ${user.isBlocked ? "bg-red-100 text-red-700" : "bg-primary-100 text-primary-700"}`}>
                   {user.name.charAt(0).toUpperCase()}
                 </div>
                 <div>
-                  <div className="font-medium text-slate-900 text-sm">{user.name}</div>
+                  <div className="font-medium text-slate-900 text-sm flex items-center gap-2">
+                    {user.name}
+                    {user.isBlocked && (
+                      <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-normal">Geblokkeerd</span>
+                    )}
+                    {user.mfaEnabled && (
+                      <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-normal" title="Twee-factor-authenticatie actief">2FA</span>
+                    )}
+                  </div>
                   <div className="text-xs text-slate-400">{user.email}</div>
                 </div>
               </div>
@@ -223,12 +244,22 @@ export default function UsersPage() {
                 >
                   Bewerken
                 </button>
-                <button
-                  onClick={() => toggleActive(user.id, user.isActive)}
-                  className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${user.isActive ? "border-slate-200 text-slate-600 hover:bg-red-50 hover:text-red-700 hover:border-red-200" : "border-green-200 text-green-700 hover:bg-green-50"}`}
-                >
-                  {user.isActive ? "Deactiveren" : "Activeren"}
-                </button>
+                {user.id !== currentUserId && (
+                  <>
+                    <button
+                      onClick={() => toggleBlocked(user.id, user.isBlocked)}
+                      className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${user.isBlocked ? "border-green-200 text-green-700 hover:bg-green-50" : "border-amber-200 text-amber-700 hover:bg-amber-50"}`}
+                    >
+                      {user.isBlocked ? "Deblokkeren" : "Blokkeren"}
+                    </button>
+                    <button
+                      onClick={() => removeUser(user.id, user.name)}
+                      className="text-xs px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-red-50 hover:text-red-700 hover:border-red-200 transition-colors"
+                    >
+                      Verwijderen
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           ))}

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requirePlatformAuth } from "@/lib/api-helpers";
+import { z } from "zod";
 
 export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const result = await requirePlatformAuth();
@@ -18,15 +19,24 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
   return NextResponse.json(tenant);
 }
 
+const patchSchema = z.object({
+  name: z.string().min(2).optional(),
+  isActive: z.boolean().optional(),
+  mfaRequired: z.boolean().optional(),
+});
+
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const result = await requirePlatformAuth(["SUPER_ADMIN"]);
   if ("error" in result) return result.error;
   const { id } = await params;
-  const body = await req.json();
+  const body = await req.json().catch(() => null);
+
+  const parsed = patchSchema.safeParse(body);
+  if (!parsed.success) return NextResponse.json({ error: "Ongeldige invoer" }, { status: 400 });
 
   const tenant = await prisma.tenant.update({
     where: { id },
-    data: { name: body.name, isActive: body.isActive },
+    data: parsed.data,
   });
   return NextResponse.json(tenant);
 }

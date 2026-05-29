@@ -2,6 +2,7 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { prisma } from "./src/lib/prisma";
+import { verifyToken } from "./src/lib/totp";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   secret: process.env.AUTH_SECRET,
@@ -13,50 +14,85 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Wachtwoord", type: "password" },
+        // accountId pint de gekozen klant (tenantUser.id) of "platform".
+        accountId: { label: "Account", type: "text" },
+        // totp: 6-cijferige code voor klanten met verplichte 2FA.
+        totp: { label: "Code", type: "text" },
       },
       authorize: async (credentials) => {
         if (!credentials?.email || !credentials?.password) return null;
         const email = credentials.email as string;
         const password = credentials.password as string;
+        const accountId = (credentials.accountId as string | undefined) || undefined;
+        const totp = (credentials.totp as string | undefined) || undefined;
 
-        // Try platform user first
-        const platformUser = await prisma.platformUser.findUnique({
-          where: { email },
-        });
-        if (platformUser && platformUser.isActive) {
-          const valid = await bcrypt.compare(password, platformUser.password);
-          if (valid) {
-            return {
-              id: platformUser.id,
-              name: platformUser.name,
-              email: platformUser.email,
-              userType: "platform" as const,
-              tenantId: null,
-              roles: [platformUser.role],
-            };
+        // ─── Platform-gebruiker ───────────────────────────────────────────
+        // Alleen proberen als er geen specifieke klant is gekozen, of het
+        // platform-account expliciet is geselecteerd.
+        if (!accountId || accountId === "platform") {
+          const platformUser = await prisma.platformUser.findUnique({
+            where: { email },
+          });
+          if (platformUser && platformUser.isActive) {
+            const valid = await bcrypt.compare(password, platformUser.password);
+            if (valid) {
+              return {
+                id: platformUser.id,
+                name: platformUser.name,
+                email: platformUser.email,
+                userType: "platform" as const,
+                tenantId: null,
+                roles: [platformUser.role],
+              };
+            }
           }
+          // Expliciet platform gekozen maar ongeldig → geen fallback.
+          if (accountId === "platform") return null;
         }
 
-        // Try tenant user
-        const tenantUser = await prisma.tenantUser.findFirst({
-          where: { email, isActive: true },
-          include: { tenant: true },
-        });
-        if (tenantUser) {
-          const valid = await bcrypt.compare(password, tenantUser.password);
-          if (valid && tenantUser.tenant.isActive) {
-            return {
-              id: tenantUser.id,
-              name: tenantUser.name,
-              email: tenantUser.email,
-              userType: "tenant" as const,
-              tenantId: tenantUser.tenantId,
-              roles: tenantUser.roles,
-            };
-          }
+        // ─── Klant-gebruiker (tenant) ─────────────────────────────────────
+        // Wanneer een account is gekozen pinnen we exact die TenantUser.
+        // Zonder keuze accepteren we alleen wanneer er precies één match is
+        // (anders moet de gebruiker eerst een klant kiezen via /api/auth/resolve).
+        const candidates = accountId
+          ? await prisma.tenantUser.findMany({
+              where: { id: accountId, email },
+              include: { tenant: true },
+            })
+          : await prisma.tenantUser.findMany({
+              where: { email },
+              include: { tenant: true },
+            });
+
+        const matched: typeof candidates = [];
+        for (const c of candidates) {
+          if (!c.isActive || c.isBlocked || !c.tenant.isActive) continue;
+          const valid = await bcrypt.compare(password, c.password);
+          if (valid) matched.push(c);
         }
 
-        return null;
+        // Zonder expliciete keuze en met meerdere mogelijke klanten weigeren
+        // we — de gebruiker moet eerst een klant selecteren.
+        if (!accountId && matched.length !== 1) return null;
+        const tenantUser = matched[0];
+        if (!tenantUser) return null;
+
+        // ─── Verplichte 2FA afdwingen ─────────────────────────────────────
+        if (tenantUser.tenant.mfaRequired) {
+          // Geen geldige koppeling → inloggen geblokkeerd tot na de
+          // koppelstap (zie /api/auth/mfa/*).
+          if (!tenantUser.mfaEnabled || !tenantUser.mfaSecret) return null;
+          if (!totp || !verifyToken(tenantUser.mfaSecret, totp)) return null;
+        }
+
+        return {
+          id: tenantUser.id,
+          name: tenantUser.name,
+          email: tenantUser.email,
+          userType: "tenant" as const,
+          tenantId: tenantUser.tenantId,
+          roles: tenantUser.roles,
+        };
       },
     }),
   ],

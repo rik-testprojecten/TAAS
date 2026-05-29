@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
 import { formatDate } from "@/lib/utils";
 
 const ROLE_LABELS: Record<string, string> = {
@@ -25,6 +26,7 @@ type Tenant = {
   name: string;
   slug: string;
   isActive: boolean;
+  mfaRequired: boolean;
   createdAt: string;
   _count?: { users: number; projects: number };
 };
@@ -32,8 +34,11 @@ type Tenant = {
 const emptyForm = { name: "", email: "", password: "", roles: [] as string[] };
 
 export default function TenantsPage() {
+  const { data: session } = useSession();
+  const isSuperAdmin = session?.user?.roles?.includes("SUPER_ADMIN") ?? false;
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(true);
+  const [mfaSaving, setMfaSaving] = useState<string | null>(null);
   const [showNew, setShowNew] = useState(false);
   const [form, setForm] = useState({ name: "", slug: "" });
   const [saving, setSaving] = useState(false);
@@ -75,6 +80,21 @@ export default function TenantsPage() {
       setError(data.error?.fieldErrors?.slug?.[0] || "Er is een fout opgetreden");
     }
     setSaving(false);
+  }
+
+  async function toggleMfaRequired(tenant: Tenant) {
+    setMfaSaving(tenant.id);
+    const res = await fetch(`/api/platform/tenants/${tenant.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mfaRequired: !tenant.mfaRequired }),
+    });
+    if (res.ok) {
+      setTenants((prev) =>
+        prev.map((t) => (t.id === tenant.id ? { ...t, mfaRequired: !t.mfaRequired } : t))
+      );
+    }
+    setMfaSaving(null);
   }
 
   function autoSlug(name: string) {
@@ -300,6 +320,24 @@ export default function TenantsPage() {
                 <span className={`badge ${t.isActive ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>
                   {t.isActive ? "Actief" : "Inactief"}
                 </span>
+                {isSuperAdmin ? (
+                  <button
+                    onClick={() => toggleMfaRequired(t)}
+                    disabled={mfaSaving === t.id}
+                    title="Bepaal of gebruikers van deze klant verplicht 2FA moeten gebruiken"
+                    className={`text-xs px-3 py-1.5 rounded-lg border transition-colors disabled:opacity-50 ${
+                      t.mfaRequired
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                        : "border-slate-200 text-slate-500 hover:bg-slate-50"
+                    }`}
+                  >
+                    {mfaSaving === t.id ? "..." : t.mfaRequired ? "2FA verplicht ✓" : "2FA optioneel"}
+                  </button>
+                ) : (
+                  <span className={`badge ${t.mfaRequired ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-500"}`}>
+                    {t.mfaRequired ? "2FA verplicht" : "2FA optioneel"}
+                  </span>
+                )}
                 <button
                   onClick={() => openContacts(t)}
                   className="btn-secondary text-xs px-3 py-1.5 flex items-center gap-1.5"

@@ -10,12 +10,13 @@ datasource db {
 // ─── PLATFORM ───────────────────────────────────────────────────────────────
 
 model Tenant {
-  id        String   @id @default(cuid())
-  name      String
-  slug      String   @unique
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  isActive    Boolean  @default(true)
+  mfaRequired Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   users          TenantUser[]
   projects       Project[]
@@ -85,15 +86,18 @@ model TemplateStep {
 // ─── TENANT ─────────────────────────────────────────────────────────────────
 
 model TenantUser {
-  id        String       @id @default(cuid())
-  tenantId  String
-  email     String
-  name      String
-  password  String
-  roles     TenantRole[]
-  isActive  Boolean      @default(true)
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+  id         String       @id @default(cuid())
+  tenantId   String
+  email      String
+  name       String
+  password   String
+  roles      TenantRole[]
+  isActive   Boolean      @default(true)
+  isBlocked  Boolean      @default(false)
+  mfaEnabled Boolean      @default(false)
+  mfaSecret  String?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
 
   tenant            Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   assignedSteps     FlowStepAssignee[]
