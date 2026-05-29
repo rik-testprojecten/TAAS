@@ -24,8 +24,10 @@ command:
 - **Database already on Prisma Migrate**: applies any new migrations, otherwise a
   no-op ("No pending migrations to apply").
 
-The only requirement is that `DATABASE_URL` is available at build time — the same
-variable `migrate deploy` needs anyway.
+If `DATABASE_URL` is **not** set at build time (e.g. a Vercel Preview build, where
+the variable is scoped to Production only), the script **skips** migrations and exits
+successfully — preview builds should not migrate the production database. Migrations
+run on the deploy that has `DATABASE_URL` (production).
 
 > Manual fallback (normally unnecessary): the baseline step the script performs
 > automatically is equivalent to running, once per existing database:

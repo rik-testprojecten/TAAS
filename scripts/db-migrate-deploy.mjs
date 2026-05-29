@@ -24,6 +24,15 @@ function run(cmd) {
   execSync(cmd, { stdio: 'inherit' });
 }
 
+// No database connection at build time (e.g. a Vercel Preview build where
+// DATABASE_URL is scoped to Production only). Skip migrations rather than failing
+// the build — preview builds should not touch the production database anyway.
+// The migration runs on the deploy that does have DATABASE_URL (production).
+if (!process.env.DATABASE_URL) {
+  console.log('DATABASE_URL is not set — skipping migrations for this build.');
+  process.exit(0);
+}
+
 const prisma = new PrismaClient();
 try {
   const [{ has_history }] = await prisma.$queryRawUnsafe(
