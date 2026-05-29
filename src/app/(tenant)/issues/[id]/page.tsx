@@ -23,6 +23,7 @@ export default function IssuePage() {
   const [resolveConfirm, setResolveConfirm] = useState(false);
   const [rejectConfirm, setRejectConfirm] = useState(false);
   const [withdrawConfirm, setWithdrawConfirm] = useState(false);
+  const [markWishConfirm, setMarkWishConfirm] = useState(false);
 
   useEffect(() => { load(); }, [id]);
 
@@ -106,6 +107,18 @@ export default function IssuePage() {
     setSaving(false);
   }
 
+  async function markAsWish() {
+    setSaving(true);
+    await fetch(`/api/issues/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "WISH" }),
+    });
+    setMarkWishConfirm(false);
+    load();
+    setSaving(false);
+  }
+
   async function resubmitIssue() {
     setSaving(true);
     await fetch(`/api/issues/${id}`, {
@@ -126,6 +139,7 @@ export default function IssuePage() {
   const flow = issue.runStep?.run?.flowVersion?.flow;
   const isOpen = !["RESOLVED", "REJECTED", "WITHDRAWN"].includes(issue.status);
   const isWithdrawn = issue.status === "WITHDRAWN";
+  const isWish = issue.type === "WISH";
   const isOwnIssue = issue.createdById === userId;
   const canWithdraw = (isTester && isOwnIssue && isOpen) || ((isFM) && isOpen);
 
@@ -136,6 +150,18 @@ export default function IssuePage() {
         <span>/</span>
         <span className="text-slate-700 truncate max-w-xs">{issue.title}</span>
       </div>
+
+      {isWish && (
+        <div className="bg-pink-50 border border-pink-200 rounded-xl p-4 mb-4 flex items-center gap-3">
+          <svg className="w-5 h-5 text-pink-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+          </svg>
+          <div>
+            <div className="text-sm font-semibold text-pink-700">Wens</div>
+            <div className="text-xs text-pink-500 mt-0.5">Deze bevinding is aangemerkt als wens en staat op de wenslijst.</div>
+          </div>
+        </div>
+      )}
 
       {isWithdrawn && (
         <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-4 flex items-center gap-3">
@@ -287,6 +313,19 @@ export default function IssuePage() {
                 <button onClick={() => setWithdrawConfirm(false)} className="btn-secondary text-sm">Annuleren</button>
               </div>
             </div>
+          ) : markWishConfirm ? (
+            <div className="space-y-3">
+              <p className="text-sm text-slate-700">Bevinding aanmerken als <strong>wens</strong>? De bevinding verdwijnt uit de bevindingen en komt op de wenslijst te staan.</p>
+              <div className="flex gap-2">
+                <button onClick={markAsWish} disabled={saving} className="flex items-center gap-2 text-sm bg-pink-600 text-white px-4 py-2 rounded-lg hover:bg-pink-700 transition-colors">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                  </svg>
+                  {saving ? "Bezig..." : "Ja, aanmerken als wens"}
+                </button>
+                <button onClick={() => setMarkWishConfirm(false)} className="btn-secondary text-sm">Annuleren</button>
+              </div>
+            </div>
           ) : (
             <div className="flex flex-wrap gap-2 items-center">
               {isOpen && !issue.retestRequired && (
@@ -305,6 +344,14 @@ export default function IssuePage() {
                   <button onClick={() => setWithdrawConfirm(true)} className="flex items-center gap-2 px-4 py-2 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50 transition-colors">
                     Intrekken
                   </button>
+                  {!isWish && (
+                    <button onClick={() => setMarkWishConfirm(true)} className="flex items-center gap-2 px-4 py-2 border border-pink-200 text-pink-600 text-sm rounded-lg hover:bg-pink-50 transition-colors">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                      </svg>
+                      Aanmerken als wens
+                    </button>
+                  )}
                 </>
               )}
               {!editMode && (
