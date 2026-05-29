@@ -35,14 +35,13 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
   });
 
   // Haal alle actieve taken in deze fase op (alle testers)
-  const runIds = runs.map((r) => r.id);
   const runStepIds = runs.flatMap((r) => r.steps.map((s) => s.id));
 
   const allOpenTasks = await prisma.task.findMany({
     where: {
       tenantId,
       status: { not: "DONE" },
-      type: "STEP_EXECUTION",
+      type: { in: ["STEP_EXECUTION", "RETEST"] },
       runStepId: { in: runStepIds },
     },
     include: {

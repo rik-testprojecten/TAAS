@@ -165,19 +165,25 @@ export default function TaskDetailPage() {
           {showIssueForm ? (
             <div className="card p-5 border-red-200 bg-red-50/50 space-y-4">
               <h2 className="font-semibold text-red-800">Bevinding melden</h2>
-              <input
-                className="input text-sm"
-                placeholder="Titel *"
-                value={issueForm.title}
-                onChange={(e) => setIssueForm({ ...issueForm, title: e.target.value })}
-              />
-              <textarea
-                className="input text-sm resize-none"
-                rows={4}
-                placeholder="Beschrijving van de bevinding *"
-                value={issueForm.description}
-                onChange={(e) => setIssueForm({ ...issueForm, description: e.target.value })}
-              />
+              <div>
+                <label className="block text-xs font-medium text-red-800 mb-1">Titel <span className="text-red-600">*</span></label>
+                <input
+                  className={`input text-sm ${!issueForm.title ? "border-red-300" : ""}`}
+                  placeholder="Vul een titel in"
+                  value={issueForm.title}
+                  onChange={(e) => setIssueForm({ ...issueForm, title: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-red-800 mb-1">Beschrijving <span className="text-red-600">*</span></label>
+                <textarea
+                  className={`input text-sm resize-none ${!issueForm.description ? "border-red-300" : ""}`}
+                  rows={4}
+                  placeholder="Beschrijf de bevinding"
+                  value={issueForm.description}
+                  onChange={(e) => setIssueForm({ ...issueForm, description: e.target.value })}
+                />
+              </div>
               <div className="flex gap-3">
                 <select className="input text-sm" value={issueForm.type} onChange={(e) => setIssueForm({ ...issueForm, type: e.target.value })}>
                   <option value="BUG">Fout</option>
@@ -248,19 +254,27 @@ export default function TaskDetailPage() {
                 value={resultForm.result}
                 onChange={(e) => setResultForm({ ...resultForm, result: e.target.value })}
               />
-              <textarea
-                className="input text-sm resize-none"
-                rows={3}
-                placeholder="Notities (optioneel)"
-                value={resultForm.notes}
-                onChange={(e) => setResultForm({ ...resultForm, notes: e.target.value })}
-              />
+              <div>
+                <label className={`block text-xs font-medium mb-1 ${resultForm.status === "FAILED" ? "text-red-600" : "text-slate-600"}`}>
+                  Notities{resultForm.status === "FAILED" ? " *" : " (optioneel)"}
+                </label>
+                <textarea
+                  className={`input text-sm resize-none ${resultForm.status === "FAILED" && !resultForm.notes.trim() ? "border-red-300 focus:ring-red-200" : ""}`}
+                  rows={3}
+                  placeholder={resultForm.status === "FAILED" ? "Reden voor mislukken (verplicht)" : "Notities (optioneel)"}
+                  value={resultForm.notes}
+                  onChange={(e) => setResultForm({ ...resultForm, notes: e.target.value })}
+                />
+                {resultForm.status === "FAILED" && !resultForm.notes.trim() && (
+                  <p className="text-xs text-red-600 mt-1">Vul een reden in als het resultaat mislukt is.</p>
+                )}
+              </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1.5">Bijlagen</label>
                 <AttachmentUploader value={resultAttachments} onChange={setResultAttachments} />
               </div>
               <div className="flex gap-2">
-                <button onClick={submitResult} disabled={saving} className="btn-primary">
+                <button onClick={submitResult} disabled={saving || (resultForm.status === "FAILED" && !resultForm.notes.trim())} className="btn-primary">
                   {saving ? "Opslaan..." : "Opslaan en terug"}
                 </button>
                 <button onClick={() => setShowResultForm(false)} className="btn-secondary">

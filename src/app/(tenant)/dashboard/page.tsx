@@ -162,7 +162,7 @@ export default async function DashboardPage() {
     { label: "Actieve projecten", value: projects.length, color: "text-primary-600", bg: "bg-primary-50", href: "/projects" },
     { label: "Open bevindingen", value: openIssues, color: "text-orange-600", bg: "bg-orange-50", href: "/issues" },
     { label: "Kritieke issues", value: criticalIssues, color: "text-red-600", bg: "bg-red-50", href: "/issues?impact=CRITICAL" },
-    { label: "Uitstaande taken", value: totalOpenTasks, color: "text-emerald-600", bg: "bg-emerald-50", href: "/tasks" },
+    { label: "Uitstaande taken", value: totalOpenTasks, color: "text-emerald-600", bg: "bg-emerald-50", href: "/projects" },
   ];
 
   return (

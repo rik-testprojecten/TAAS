@@ -324,19 +324,25 @@ export default function RunPage() {
                 {showIssueFor === step.id && (
                   <div className="mt-3 ml-12 space-y-3 p-3 bg-red-50 rounded-lg border border-red-200">
                     <h5 className="text-sm font-semibold text-red-800">Bevinding melden</h5>
-                    <input
-                      className="input text-sm"
-                      placeholder="Titel *"
-                      value={issueForm.title}
-                      onChange={(e) => setIssueForm({ ...issueForm, title: e.target.value })}
-                    />
-                    <textarea
-                      className="input text-sm resize-none"
-                      rows={3}
-                      placeholder="Beschrijving *"
-                      value={issueForm.description}
-                      onChange={(e) => setIssueForm({ ...issueForm, description: e.target.value })}
-                    />
+                    <div>
+                      <label className="block text-xs font-medium text-red-800 mb-1">Titel <span className="text-red-600">*</span></label>
+                      <input
+                        className={`input text-sm ${!issueForm.title ? "border-red-300" : ""}`}
+                        placeholder="Vul een titel in"
+                        value={issueForm.title}
+                        onChange={(e) => setIssueForm({ ...issueForm, title: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-red-800 mb-1">Beschrijving <span className="text-red-600">*</span></label>
+                      <textarea
+                        className={`input text-sm resize-none ${!issueForm.description ? "border-red-300" : ""}`}
+                        rows={3}
+                        placeholder="Beschrijf de bevinding"
+                        value={issueForm.description}
+                        onChange={(e) => setIssueForm({ ...issueForm, description: e.target.value })}
+                      />
+                    </div>
                     <div className="flex gap-3">
                       <select className="input text-sm" value={issueForm.type} onChange={(e) => setIssueForm({ ...issueForm, type: e.target.value })}>
                         <option value="BUG">Fout</option>
