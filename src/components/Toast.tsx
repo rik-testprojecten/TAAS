@@ -1,5 +1,5 @@
 "use client";
-import { createContext, useContext, useState, useCallback } from "react";
+import { createContext, useContext, useState, useCallback, useMemo } from "react";
 
 type ToastType = "success" | "error" | "info";
 type ToastItem = { id: number; message: string; type: ToastType };
@@ -8,11 +8,15 @@ const ToastContext = createContext<(message: string, type?: ToastType) => void>(
 
 export function useToast() {
   const add = useContext(ToastContext);
-  return {
-    success: (msg: string) => add(msg, "success"),
-    error: (msg: string) => add(msg, "error"),
-    info: (msg: string) => add(msg, "info"),
-  };
+  // Stable reference so it can safely sit in effect dependency arrays.
+  return useMemo(
+    () => ({
+      success: (msg: string) => add(msg, "success"),
+      error: (msg: string) => add(msg, "error"),
+      info: (msg: string) => add(msg, "info"),
+    }),
+    [add],
+  );
 }
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
@@ -27,10 +31,17 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={add}>
       {children}
-      <div className="fixed bottom-4 right-4 z-[200] flex flex-col gap-2 pointer-events-none">
+      <div
+        className="fixed bottom-4 right-4 z-[200] flex flex-col gap-2 pointer-events-none"
+        role="region"
+        aria-label="Meldingen"
+        aria-live="polite"
+        aria-atomic="false"
+      >
         {toasts.map((toast) => (
           <div
             key={toast.id}
+            role={toast.type === "error" ? "alert" : "status"}
             className={`px-4 py-3 rounded-xl shadow-lg text-sm font-medium text-white pointer-events-auto flex items-center gap-2 animate-in slide-in-from-bottom-2 ${
               toast.type === "success"
                 ? "bg-emerald-600"

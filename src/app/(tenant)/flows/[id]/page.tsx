@@ -180,8 +180,8 @@ export default function FlowBuilderPage() {
     fetch("/api/users")
       .then((r) => r.json())
       .then((data) => { if (Array.isArray(data)) setTenantUsers(data); })
-      .catch(() => {});
-  }, []);
+      .catch(() => toast.error("Gebruikers konden niet worden geladen"));
+  }, [toast]);
 
   async function load() {
     const res = await fetch(`/api/flows/${id}`);

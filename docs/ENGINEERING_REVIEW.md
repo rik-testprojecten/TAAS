@@ -146,27 +146,32 @@ Severity: 🔴 critical · 🟡 high · 🟢 medium/low.
 
 ---
 
-## 3. UX optimization (recommendations only)
+## 3. UX optimization (implemented)
 
-Written recommendations per the agreed scope; no UI code changes in this PR
-beyond the new accessible `set-password` page.
+Originally scoped as written recommendations; subsequently **implemented** via a
+set of reusable accessible primitives adopted across the app. See
+[§8 UX implementation](#8-ux-implementation) for the component list and coverage.
 
-1. **Progressive disclosure on god-pages.** Split the phase editor into tabs/
-   sections (Flows · Monitor · Settings) and lazy-mount each; extract state into
-   hooks (`usePhaseEditor`, `useFlowEditor`) to cut re-render scope and LOC.
-2. **Form accessibility & feedback.** Associate every input with `<label
-   htmlFor>`; add `aria-invalid` + `aria-describedby` for inline errors; show
-   field-level messages instead of disabled-button-only gating. (The new
-   `set-password` page demonstrates the labeled-input pattern.)
-3. **Semantic landmarks.** Use `<header>`/`<nav>`/`<main>`; render tabular lists
-   (issues, tasks, audit) as `<table>` with `<th scope>` for screen-reader and
-   keyboard support.
-4. **Fast feedback loops.** Surface every fetch failure as a toast (replace empty
-   `.catch(()=>{})`); add optimistic UI + skeleton/loading states on long lists.
-5. **Modal correctness.** Add focus traps, restore focus on close, and `Esc`
-   handling consistently across dialogs.
-6. **Mobile-first lists.** Replace grid-as-table with responsive
-   card/table-switch patterns; verify the 1000-LOC pages at small viewports.
+1. **Progressive disclosure on god-pages.** ✅ Accessible `Tabs` primitive
+   (WAI-ARIA `tablist`, roving arrow-key nav) applied to the phase editor.
+   Remaining: extract page state into hooks (`usePhaseEditor`, `useFlowEditor`)
+   to cut LOC — tracked in §5.
+2. **Form accessibility & feedback.** ✅ `Field`/`TextareaField`/`SelectField`
+   wrappers associate every input with `<label htmlFor>` and wire
+   `aria-invalid`/`aria-describedby`; adopted on users, projects, go-live,
+   audit, checklists, sidebar settings.
+3. **Semantic landmarks & tables.** ✅ `<header>` landmarks across pages, skip-to-
+   content links + `<main id>` in both layouts, and a semantic `<table>` with
+   `<th scope>` + `<caption>` for the users list (card lists kept where richer).
+4. **Fast feedback loops.** ✅ All empty `.catch(()=>{})` replaced with toast
+   errors; `aria-live` toast region; skeleton loaders (`Skeleton`,
+   `TableSkeleton`, `CardGridSkeleton`) on every list/detail load.
+5. **Modal correctness.** ✅ `Modal`/`ConfirmDialog` primitives with focus trap,
+   focus restore, `Esc`, scroll-lock and `role="dialog"`; adopted on users,
+   projects, checklists, sidebar; native `confirm()` removed; `SearchModal`
+   hardened.
+6. **Mobile-first lists.** ✅ Responsive table (column collapse on small screens)
+   on users; responsive detail grids on audit.
 
 ---
 
@@ -279,3 +284,55 @@ Implemented in the same change set as this document:
   short-lived URLs) is the stronger end state.
 - Items #11–#14 in §4 are intentionally deferred (dependency stability, external
   infra, and operator-supplied legal/governance content).
+
+---
+
+## 8. UX implementation
+
+Reusable accessible primitives added (`src/components/`):
+
+- **`Modal.tsx`** — `Modal` + `ConfirmDialog`: `role="dialog"`/`aria-modal`,
+  labelled by title, focus trap, focus restoration, `Esc`, body scroll-lock,
+  backdrop-click close.
+- **`Field.tsx`** — `Field`/`TextareaField`/`SelectField`: generated id,
+  `<label htmlFor>`, `aria-invalid`/`aria-describedby`/`aria-required`, hint &
+  error slots.
+- **`Tabs.tsx`** — `Tabs`/`TabPanel`: WAI-ARIA tabs pattern with roving
+  arrow/Home/End key navigation.
+- **`Skeleton.tsx`** — `Skeleton`/`Spinner`/`TableSkeleton`/`CardGridSkeleton`
+  with `aria-busy` regions.
+- **`Toast.tsx`** — upgraded to an `aria-live` region; errors use `role="alert"`,
+  successes `role="status"`; `useToast()` now returns a stable reference (safe in
+  effect deps).
+
+Shared CSS (`src/app/globals.css`): `.label`, `.field-error`, `.field-hint`,
+`.input-error`, `.skeleton`, `.data-table`, plus `focus-visible` rings and
+disabled states on the button classes.
+
+Adoption by page:
+
+| Page | Changes |
+|------|---------|
+| `layout` (tenant + platform) | skip-to-content link, `<main id>` |
+| `users` | semantic `<table>` + caption, Modal create/edit, Field forms, TableSkeleton, toasts |
+| `audit` | `<header>`, accessible filters, skeletons, `aria-expanded` detail toggles, toasts |
+| `projects` | Modal + Field/Textarea/Select, CardGridSkeleton, toasts |
+| `go-live` | Field/SelectField throughout, save/load toasts, skeleton |
+| `checklists` | Modal + ConfirmDialog (replaces native `confirm()`), Field, progressbar role, toasts |
+| `issues` / `my-issues` / `tasks` | skeleton loaders, error toasts, `<header>`, `aria-pressed` toggles, labelled filters |
+| `reports` | `<header>`, `role="alert"`, skeleton, fetch toasts |
+| `dashboard` | `<header>` landmarks, descriptive logo alt |
+| `phases/[phaseId]` | accessible `Tabs`, empty-catch toasts |
+| `SearchModal` / `Sidebar` | `role="dialog"` + focus restore; settings modal → `Modal` |
+
+**Remaining (tracked in §5):** extracting god-page state into hooks and the PDF
+module decomposition — structural refactors deferred to avoid behavioural risk in
+the untested 800–1000 LOC pages this round.
+
+### Verification (UX)
+- `npx tsc --noEmit` — clean.
+- `next build` — succeeds; 38/38 pages generate.
+- Manual a11y reasoning: dialogs trap and restore focus; forms expose labels and
+  `aria-invalid`; lists announce loading via `aria-busy`; toasts announce via
+  `aria-live`; tab bar is arrow-key navigable; skip link reaches `#main-content`.
+- No test suite exists, so validation is type-check + build + manual review.

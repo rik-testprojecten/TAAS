@@ -47,6 +47,7 @@ export function SearchModal() {
   const [loading, setLoading] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const previouslyFocused = useRef<HTMLElement | null>(null);
   const router = useRouter();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -55,10 +56,15 @@ export function SearchModal() {
     setQuery("");
     setResults([]);
     setActiveIndex(0);
+    // Return focus to whatever opened the search (e.g. the sidebar button).
+    previouslyFocused.current?.focus?.();
   }, []);
 
   useEffect(() => {
-    const handler = () => setOpen(true);
+    const handler = () => {
+      previouslyFocused.current = document.activeElement as HTMLElement | null;
+      setOpen(true);
+    };
     window.addEventListener("taas:open-search", handler);
     return () => window.removeEventListener("taas:open-search", handler);
   }, []);
@@ -102,8 +108,13 @@ export function SearchModal() {
 
   return (
     <div className="fixed inset-0 z-[200] flex items-start justify-center pt-[15vh] px-4">
-      <div className="absolute inset-0 bg-black/60" onClick={close} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+      <div className="absolute inset-0 bg-black/60" onClick={close} aria-hidden="true" />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Zoeken"
+        className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden"
+      >
         {/* Input */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-100">
           <svg className="w-5 h-5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">

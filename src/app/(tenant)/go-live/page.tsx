@@ -2,6 +2,8 @@
 import { useState, useEffect } from "react";
 import { formatDate } from "@/lib/utils";
 import { HelpButton } from "@/components/HelpButton";
+import { Field, SelectField } from "@/components/Field";
+import { useToast } from "@/components/Toast";
 
 const IMPACTS = [
   { key: "CRITICAL", label: "Kritiek", color: "text-red-700 bg-red-50 border-red-200" },
@@ -11,7 +13,8 @@ const IMPACTS = [
 ] as const;
 
 export default function GoLivePage() {
-  const [projects, setProjects] = useState<any[]>([]);
+  const toast = useToast();
+  const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
   const [selectedProject, setSelectedProject] = useState<string>("");
   const [data, setData] = useState<{ criteria: any; counts: Record<string, number> } | null>(null);
   const [loading, setLoading] = useState(false);
@@ -32,8 +35,9 @@ export default function GoLivePage() {
         const list = Array.isArray(d) ? d : [];
         setProjects(list);
         if (list.length > 0) setSelectedProject(list[0].id);
-      });
-  }, []);
+      })
+      .catch(() => toast.error("Projecten konden niet worden geladen"));
+  }, [toast]);
 
   useEffect(() => {
     if (!selectedProject) return;
@@ -60,23 +64,30 @@ export default function GoLivePage() {
 
   async function save() {
     setSaving(true);
-    await fetch("/api/go-live", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        projectId: selectedProject,
-        goLiveDate: form.goLiveDate || null,
-        goNoGoDate: form.goNoGoDate || null,
-        maxCritical: form.maxCritical !== "" ? parseInt(form.maxCritical) : null,
-        maxHigh: form.maxHigh !== "" ? parseInt(form.maxHigh) : null,
-        maxMedium: form.maxMedium !== "" ? parseInt(form.maxMedium) : null,
-        maxLow: form.maxLow !== "" ? parseInt(form.maxLow) : null,
-      }),
-    });
-    setSaving(false);
-    // Refresh counts
-    const r = await fetch(`/api/go-live?projectId=${selectedProject}`);
-    setData(await r.json());
+    try {
+      const res = await fetch("/api/go-live", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId: selectedProject,
+          goLiveDate: form.goLiveDate || null,
+          goNoGoDate: form.goNoGoDate || null,
+          maxCritical: form.maxCritical !== "" ? parseInt(form.maxCritical) : null,
+          maxHigh: form.maxHigh !== "" ? parseInt(form.maxHigh) : null,
+          maxMedium: form.maxMedium !== "" ? parseInt(form.maxMedium) : null,
+          maxLow: form.maxLow !== "" ? parseInt(form.maxLow) : null,
+        }),
+      });
+      if (!res.ok) throw new Error();
+      toast.success("Go-live criteria opgeslagen");
+      // Refresh counts
+      const r = await fetch(`/api/go-live?projectId=${selectedProject}`);
+      setData(await r.json());
+    } catch {
+      toast.error("Opslaan mislukt — probeer het opnieuw");
+    } finally {
+      setSaving(false);
+    }
   }
 
   const maxMap: Record<string, number | null> = {
@@ -88,78 +99,75 @@ export default function GoLivePage() {
 
   return (
     <div className="p-4 md:p-8 max-w-3xl">
-      <div className="mb-6">
+      <header className="mb-6">
         <h1 className="text-2xl font-bold text-slate-900">Go-live Criteria</h1>
         <p className="text-slate-500 text-sm mt-1">Stel per project de go-live- en go/no-go-datum in en het maximale aantal openstaande bevindingen per impact.</p>
-      </div>
+      </header>
 
       {/* Project selector */}
       <div className="card p-4 mb-6">
-        <label className="block text-sm font-medium text-slate-700 mb-2">Project</label>
-        <select
-          className="input w-full"
+        <SelectField
+          label="Project"
           value={selectedProject}
           onChange={(e) => setSelectedProject(e.target.value)}
         >
           {projects.map((p) => (
             <option key={p.id} value={p.id}>{p.name}</option>
           ))}
-        </select>
+        </SelectField>
       </div>
 
       {loading ? (
-        <div className="text-slate-500 text-sm">Laden...</div>
+        <div className="card p-6 space-y-4" aria-busy="true" aria-label="Criteria laden">
+          <div className="skeleton h-5 w-32" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="skeleton h-10" /><div className="skeleton h-10" />
+            <div className="skeleton h-10" /><div className="skeleton h-10" />
+          </div>
+        </div>
       ) : (
         <>
           {/* Criteria form */}
           <div className="card p-6 mb-6">
             <h2 className="font-semibold text-slate-900 mb-4">Datums</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Go-live datum</label>
-                <input
-                  type="date"
-                  className="input"
-                  value={form.goLiveDate}
-                  onChange={(e) => setForm({ ...form, goLiveDate: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Go/no-go datum</label>
-                <input
-                  type="date"
-                  className="input"
-                  value={form.goNoGoDate}
-                  onChange={(e) => setForm({ ...form, goNoGoDate: e.target.value })}
-                />
-                <p className="text-xs text-slate-400 mt-1">Op deze datum wordt getoetst of go-live verantwoord is</p>
-              </div>
+              <Field
+                label="Go-live datum"
+                type="date"
+                value={form.goLiveDate}
+                onChange={(e) => setForm({ ...form, goLiveDate: e.target.value })}
+              />
+              <Field
+                label="Go/no-go datum"
+                type="date"
+                value={form.goNoGoDate}
+                onChange={(e) => setForm({ ...form, goNoGoDate: e.target.value })}
+                hint="Op deze datum wordt getoetst of go-live verantwoord is"
+              />
             </div>
 
             <h2 className="font-semibold text-slate-900 mb-3">Max. openstaande bevindingen op go/no-go datum</h2>
             <p className="text-xs text-slate-500 mb-4">Laat een veld leeg voor onbeperkt (∞). Vul 0 in voor nul toegestaan.</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
               {IMPACTS.map(({ key, label }) => (
-                <div key={key}>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Impact: {label}</label>
-                  <input
-                    type="number"
-                    min={0}
-                    className="input"
-                    placeholder="∞ (onbeperkt)"
-                    value={key === "CRITICAL" ? form.maxCritical : key === "HIGH" ? form.maxHigh : key === "MEDIUM" ? form.maxMedium : form.maxLow}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      setForm({
-                        ...form,
-                        ...(key === "CRITICAL" ? { maxCritical: v } : {}),
-                        ...(key === "HIGH" ? { maxHigh: v } : {}),
-                        ...(key === "MEDIUM" ? { maxMedium: v } : {}),
-                        ...(key === "LOW" ? { maxLow: v } : {}),
-                      });
-                    }}
-                  />
-                </div>
+                <Field
+                  key={key}
+                  label={`Impact: ${label}`}
+                  type="number"
+                  min={0}
+                  placeholder="∞ (onbeperkt)"
+                  value={key === "CRITICAL" ? form.maxCritical : key === "HIGH" ? form.maxHigh : key === "MEDIUM" ? form.maxMedium : form.maxLow}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setForm({
+                      ...form,
+                      ...(key === "CRITICAL" ? { maxCritical: v } : {}),
+                      ...(key === "HIGH" ? { maxHigh: v } : {}),
+                      ...(key === "MEDIUM" ? { maxMedium: v } : {}),
+                      ...(key === "LOW" ? { maxLow: v } : {}),
+                    });
+                  }}
+                />
               ))}
             </div>
 

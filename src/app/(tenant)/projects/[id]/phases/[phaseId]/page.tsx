@@ -3,8 +3,11 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { STATUS_COLORS, PHASE_DESCRIPTIONS, PHASE_STATUS_LABELS, RUN_STATUS_LABELS, formatDate, todayISO, daysFromNowISO } from "@/lib/utils";
+import { Tabs } from "@/components/Tabs";
+import { useToast } from "@/components/Toast";
 
 export default function PhasePage() {
+  const toast = useToast();
   const { id, phaseId } = useParams<{ id: string; phaseId: string }>();
   const [phase, setPhase] = useState<any>(null);
   const [templates, setTemplates] = useState<any[]>([]);
@@ -60,11 +63,11 @@ export default function PhasePage() {
     fetch("/api/platform/templates")
       .then(r => r.json())
       .then(d => setTemplates(Array.isArray(d) ? d : []))
-      .catch(() => {});
+      .catch(() => toast.error("Sjablonen konden niet worden geladen"));
     fetch("/api/users")
       .then(r => r.json())
       .then(d => setTenantUsers(Array.isArray(d) ? d : []))
-      .catch(() => {});
+      .catch(() => toast.error("Gebruikers konden niet worden geladen"));
   }, [phaseId, load]);
 
   async function loadMonitor() {
@@ -411,26 +414,19 @@ export default function PhasePage() {
       )}
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-6 border-b border-slate-200">
-        <button
-          onClick={() => setActiveTab("flows")}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === "flows" ? "border-primary-600 text-primary-600" : "border-transparent text-slate-500 hover:text-slate-700"}`}
-        >
-          Flows ({phase.flows.length})
-        </button>
-        <button
-          onClick={() => setActiveTab("monitor")}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${activeTab === "monitor" ? "border-primary-600 text-primary-600" : "border-transparent text-slate-500 hover:text-slate-700"}`}
-        >
-          Monitoring
-          {monitorData?.stats?.totalOpen > 0 && (
-            <span className="bg-emerald-100 text-emerald-700 text-xs px-1.5 py-0.5 rounded-full font-medium">{monitorData.stats.totalOpen}</span>
-          )}
-          {monitorData?.stats?.totalStale > 0 && (
-            <span className="bg-amber-100 text-amber-700 text-xs px-1.5 py-0.5 rounded-full font-medium">{monitorData.stats.totalStale} verlopen</span>
-          )}
-        </button>
-      </div>
+      <Tabs
+        className="mb-6"
+        active={activeTab}
+        onChange={(id) => setActiveTab(id as "flows" | "monitor")}
+        tabs={[
+          { id: "flows", label: "Flows", count: phase.flows.length },
+          {
+            id: "monitor",
+            label: monitorData?.stats?.totalStale > 0 ? `Monitoring · ${monitorData.stats.totalStale} verlopen` : "Monitoring",
+            count: monitorData?.stats?.totalOpen || undefined,
+          },
+        ]}
+      />
 
       {/* ── FLOWS TAB ── */}
       {activeTab === "flows" && ganttData && phase.flows.length > 0 && (

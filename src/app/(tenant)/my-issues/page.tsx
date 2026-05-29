@@ -1,33 +1,53 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { STATUS_COLORS, IMPACT_COLORS, ISSUE_TYPE_LABELS, ISSUE_IMPACT_LABELS, ISSUE_STATUS_LABELS, formatDateTime } from "@/lib/utils";
 import { HelpButton } from "@/components/HelpButton";
+import { CardGridSkeleton } from "@/components/Skeleton";
+import { useToast } from "@/components/Toast";
+import type { Issue } from "@/types";
 
 export default function MyIssuesPage() {
-  const [issues, setIssues] = useState<any[]>([]);
+  const toast = useToast();
+  const [issues, setIssues] = useState<Issue[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => { load(); }, []);
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch("/api/issues?mine=1");
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setIssues(Array.isArray(data) ? data : []);
+    } catch {
+      toast.error("Bevindingen konden niet worden geladen");
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
 
-  async function load() {
-    const res = await fetch("/api/issues?mine=1");
-    const data = await res.json();
-    setIssues(Array.isArray(data) ? data : []);
-    setLoading(false);
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) {
+    return (
+      <div className="p-4 md:p-8">
+        <header className="mb-6">
+          <h1 className="text-2xl font-bold text-slate-900">Mijn Bevindingen</h1>
+          <p className="text-slate-500 text-sm mt-1">Overzicht van alle bevindingen die jij hebt gemeld</p>
+        </header>
+        <CardGridSkeleton count={4} />
+      </div>
+    );
   }
-
-  if (loading) return <div className="p-8 text-slate-500">Laden...</div>;
 
   const activeIssues = issues.filter((i) => i.status !== "WITHDRAWN");
   const withdrawnIssues = issues.filter((i) => i.status === "WITHDRAWN");
 
   return (
     <div className="p-4 md:p-8">
-      <div className="mb-6">
+      <header className="mb-6">
         <h1 className="text-2xl font-bold text-slate-900">Mijn Bevindingen</h1>
         <p className="text-slate-500 text-sm mt-1">Overzicht van alle bevindingen die jij hebt gemeld</p>
-      </div>
+      </header>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
         {/* Actieve bevindingen */}
@@ -63,7 +83,7 @@ export default function MyIssuesPage() {
   );
 }
 
-function IssueCard({ issue, withdrawn }: { issue: any; withdrawn?: boolean }) {
+function IssueCard({ issue, withdrawn }: { issue: Issue; withdrawn?: boolean }) {
   const project = issue.runStep?.run?.flowVersion?.flow?.phase?.project;
   return (
     <Link
@@ -84,7 +104,7 @@ function IssueCard({ issue, withdrawn }: { issue: any; withdrawn?: boolean }) {
           {project && <div className="text-xs text-slate-400 mt-1">{project.name} — {issue.runStep?.run?.flowVersion?.flow?.name}</div>}
           <div className="text-xs text-slate-400 mt-1 flex gap-3">
             <span>{formatDateTime(issue.createdAt)}</span>
-            {issue._count?.comments > 0 && <span>{issue._count.comments} reactie{issue._count.comments !== 1 ? "s" : ""}</span>}
+            {(issue._count?.comments ?? 0) > 0 && <span>{issue._count?.comments} reactie{issue._count?.comments !== 1 ? "s" : ""}</span>}
           </div>
         </div>
         <span className={`badge shrink-0 ${withdrawn ? "bg-gray-100 text-gray-600" : (STATUS_COLORS[issue.status] ?? "bg-gray-100 text-gray-700")}`}>
