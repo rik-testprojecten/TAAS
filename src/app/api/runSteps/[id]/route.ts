@@ -39,12 +39,69 @@ async function createTasksForStep(runStepId: string, stepTitle: string, tenantId
 }
 
 async function advanceToNextStep(runId: string, completedOrder: number, tenantId: string) {
+  // Alleen primaire RunSteps (geen thread-instanties)
   const nextStep = await prisma.runStep.findFirst({
-    where: { runId, tenantId, order: { gt: completedOrder }, status: "PENDING" },
+    where: { runId, tenantId, order: { gt: completedOrder }, status: "PENDING", parentRunStepId: null },
     orderBy: { order: "asc" },
   });
   if (nextStep) {
     await createTasksForStep(nextStep.id, nextStep.title, tenantId);
+  }
+}
+
+async function createThreadedNextStep(
+  currentStep: { id: string; runId: string; order: number },
+  tenantId: string,
+  threadInitiatorId: string
+) {
+  const run = await prisma.testRun.findUnique({
+    where: { id: currentStep.runId },
+    include: {
+      flowVersion: {
+        include: {
+          steps: {
+            where: { order: { gt: currentStep.order }, isArchived: false },
+            orderBy: { order: "asc" },
+            take: 1,
+            include: { assignees: true },
+          },
+        },
+      },
+    },
+  });
+
+  const nextFlowStep = run?.flowVersion?.steps?.[0];
+  if (!nextFlowStep) return;
+
+  // Initiator-routing: initiator krijgt de taak als hij assignee is van volgende stap;
+  // anders gaan alle assignees de taak krijgen (bijv. Marisha die niet de thread-starter is)
+  const allAssigneeIds = nextFlowStep.assignees.map((a) => a.userId);
+  const initiatorIsAssignee = allAssigneeIds.includes(threadInitiatorId);
+  const targetUserIds = initiatorIsAssignee ? [threadInitiatorId] : allAssigneeIds;
+
+  const newRunStep = await prisma.runStep.create({
+    data: {
+      runId: currentStep.runId,
+      tenantId,
+      order: nextFlowStep.order,
+      title: nextFlowStep.title,
+      instruction: nextFlowStep.instruction,
+      expectedResult: nextFlowStep.expectedResult ?? undefined,
+      parentRunStepId: currentStep.id,
+      threadInitiatorId,
+      status: "PENDING",
+    },
+  });
+
+  if (targetUserIds.length > 0) {
+    await prisma.runStepAssignee.createMany({
+      data: targetUserIds.map((userId) => ({
+        runStepId: newRunStep.id,
+        userId,
+        tenantId,
+      })),
+    });
+    await createTasksForStep(newRunStep.id, newRunStep.title, tenantId);
   }
 }
 
@@ -133,8 +190,21 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         data: { retestRequired: false },
       });
 
-      await advanceToNextStep(step.runId, step.order, tenantId);
+      if (step.parentRunStepId) {
+        // Threaded RunStep: doorgeven met dezelfde initiator
+        await createThreadedNextStep(step, tenantId, step.threadInitiatorId!);
+      } else {
+        // Primaire RunStep: gebruik de bestaande primaire RunStep voor de volgende stap
+        await advanceToNextStep(step.runId, step.order, tenantId);
+      }
+
       await checkAndFinalizeRun(step.runId);
+    } else {
+      // Niet de eerste completion op een primaire stap: start een nieuwe thread
+      // (alleen zinvol voor primaire RunSteps; threaded steps hebben 1 doelgebruiker)
+      if (!step.parentRunStepId) {
+        await createThreadedNextStep(step, tenantId, user.id);
+      }
     }
   } else {
     // No-assignee path or non-terminal status: update step directly
@@ -152,7 +222,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         data: { retestRequired: false },
       });
 
-      await advanceToNextStep(step.runId, step.order, tenantId);
+      if (step.parentRunStepId) {
+        await createThreadedNextStep(step, tenantId, step.threadInitiatorId!);
+      } else {
+        await advanceToNextStep(step.runId, step.order, tenantId);
+      }
       await checkAndFinalizeRun(step.runId);
       // Close this user's own tasks (STEP_EXECUTION and RETEST) for this step
       await prisma.task.updateMany({

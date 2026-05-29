@@ -1,6 +1,5 @@
 "use client";
 import { useState, useEffect } from "react";
-import { STATUS_COLORS } from "@/lib/utils";
 import { HelpButton } from "@/components/HelpButton";
 
 const ROLE_LABELS: Record<string, string> = {
@@ -9,6 +8,8 @@ const ROLE_LABELS: Record<string, string> = {
   TESTER: "Tester",
   FUNCTIONAL_MANAGER: "Functioneel Beheerder",
 };
+
+const ALL_ROLES = Object.keys(ROLE_LABELS);
 
 export default function UsersPage() {
   const [users, setUsers] = useState<any[]>([]);
@@ -19,6 +20,9 @@ export default function UsersPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [emailDomain, setEmailDomain] = useState<string | null>(null);
+  const [editUser, setEditUser] = useState<{ id: string; name: string; roles: string[] } | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState("");
 
   useEffect(() => { load(); loadSettings(); }, []);
 
@@ -60,12 +64,36 @@ export default function UsersPage() {
   }
 
   async function toggleActive(userId: string, isActive: boolean) {
-    await fetch(`/api/users/${userId}`, {
+    try {
+      await fetch(`/api/users/${userId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isActive: !isActive }),
+      });
+    } catch {
+      // Fout negeren, herlaad altijd
+    }
+    await load();
+  }
+
+  async function saveEdit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editUser) return;
+    setEditSaving(true);
+    setEditError("");
+    const res = await fetch(`/api/users/${editUser.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ isActive: !isActive }),
+      body: JSON.stringify({ name: editUser.name, roles: editUser.roles }),
     });
-    load();
+    if (res.ok) {
+      setEditUser(null);
+      await load();
+    } else {
+      const data = await res.json();
+      setEditError(data.error || "Er is een fout opgetreden");
+    }
+    setEditSaving(false);
   }
 
   function toggleRole(role: string) {
@@ -190,6 +218,12 @@ export default function UsersPage() {
                   ))}
                 </div>
                 <button
+                  onClick={() => setEditUser({ id: user.id, name: user.name, roles: user.roles })}
+                  className="text-xs px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
+                >
+                  Bewerken
+                </button>
+                <button
                   onClick={() => toggleActive(user.id, user.isActive)}
                   className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${user.isActive ? "border-slate-200 text-slate-600 hover:bg-red-50 hover:text-red-700 hover:border-red-200" : "border-green-200 text-green-700 hover:bg-green-50"}`}
                 >
@@ -200,6 +234,56 @@ export default function UsersPage() {
           ))}
         </div>
       </div>
+
+      {/* Gebruiker bewerken modal */}
+      {editUser && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md">
+            <h2 className="font-semibold text-lg mb-4">Gebruiker bewerken</h2>
+            <form onSubmit={saveEdit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Naam *</label>
+                <input
+                  className="input"
+                  value={editUser.name}
+                  onChange={e => setEditUser({ ...editUser, name: e.target.value })}
+                  required
+                  minLength={2}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Rollen *</label>
+                <div className="space-y-2">
+                  {ALL_ROLES.map((role) => (
+                    <label key={role} className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={editUser.roles.includes(role)}
+                        onChange={() => setEditUser({
+                          ...editUser,
+                          roles: editUser.roles.includes(role)
+                            ? editUser.roles.filter(r => r !== role)
+                            : [...editUser.roles, role],
+                        })}
+                        className="rounded"
+                      />
+                      {ROLE_LABELS[role]}
+                    </label>
+                  ))}
+                </div>
+              </div>
+              {editError && <div className="text-red-600 text-sm bg-red-50 px-3 py-2 rounded">{editError}</div>}
+              <div className="flex gap-3 pt-2">
+                <button type="submit" disabled={editSaving || editUser.roles.length === 0} className="btn-primary flex-1">
+                  {editSaving ? "Opslaan..." : "Opslaan"}
+                </button>
+                <button type="button" onClick={() => setEditUser(null)} className="btn-secondary flex-1">Annuleren</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       <HelpButton pageKey="users" />
     </div>
   );

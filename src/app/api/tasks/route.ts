@@ -13,7 +13,7 @@ export async function GET() {
       runStep: { include: { run: { include: { flowVersion: { include: { flow: { include: { phase: { include: { project: true } } } } } } } } } },
       issue: { select: { id: true, title: true, type: true, impact: true, status: true } },
     },
-    orderBy: { createdAt: "desc" },
+    orderBy: { createdAt: "asc" },
   });
   return NextResponse.json(tasks);
 }

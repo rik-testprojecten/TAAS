@@ -65,16 +65,23 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const isWithdrawing = parsed.data.status === "WITHDRAWN" && issue.status !== "WITHDRAWN";
   const isResolvingNow = parsed.data.status === "RESOLVED" && issue.status !== "RESOLVED";
+  const isRejectingNow = parsed.data.status === "REJECTED" && issue.status !== "REJECTED";
+
+  const isAdmin = user.roles.includes("TENANT_ADMIN");
+  const isFM = user.roles.includes("FUNCTIONAL_MANAGER");
+  const isTester = user.roles.includes("TESTER");
+  const isOwnIssue = issue.createdById === user.id;
 
   // Tester kan alleen WITHDRAWN zetten op eigen bevinding
   if (isWithdrawing) {
-    const isTester = user.roles.includes("TESTER");
-    const isOwnIssue = issue.createdById === user.id;
-    const isAdmin = user.roles.includes("TENANT_ADMIN");
-    const isFM = user.roles.includes("FUNCTIONAL_MANAGER");
     if (!((isTester && isOwnIssue) || isAdmin || isFM)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
+  }
+
+  // Alleen FM/TENANT_ADMIN of de instuurder mag een bevinding bewerken
+  if (!isAdmin && !isFM && !isOwnIssue) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const before = { status: issue.status, impact: issue.impact, title: issue.title };
@@ -102,34 +109,34 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       data: { completedAt: null, completedStatus: null },
     });
 
-    const assignees = issue.runStep?.assignees ?? [];
-    if (assignees.length > 0) {
-      await prisma.task.createMany({
-        data: assignees.map((a) => ({
-          tenantId,
-          userId: a.userId,
-          type: "RETEST" as const,
-          title: `Hertest: ${issue.title}`,
-          description: `Bevinding opgelost, hertest vereist voor stap.`,
-          issueId: id,
-          runStepId: issue.runStepId!,
-          status: "OPEN" as const,
-        })),
-      });
-    } else {
-      await prisma.task.create({
-        data: {
-          tenantId,
-          userId: issue.createdById,
-          type: "RETEST",
-          title: `Hertest: ${issue.title}`,
-          description: `Bevinding opgelost, hertest vereist voor stap.`,
-          issueId: id,
-          runStepId: issue.runStepId,
-          status: "OPEN",
-        },
-      });
-    }
+    // Hertest taak gaat altijd alleen naar de instuurder van de bevinding
+    await prisma.task.create({
+      data: {
+        tenantId,
+        userId: issue.createdById,
+        type: "RETEST",
+        title: `Hertest: ${issue.title}`,
+        description: `Bevinding opgelost, hertest vereist voor stap.`,
+        issueId: id,
+        runStepId: issue.runStepId,
+        status: "OPEN",
+      },
+    });
+  }
+
+  // Bij afwijzing: notificatietaak voor de instuurder
+  if (isRejectingNow) {
+    await prisma.task.create({
+      data: {
+        tenantId,
+        userId: issue.createdById,
+        type: "QUESTION",
+        title: `Bevinding afgewezen: ${issue.title}`,
+        description: `Jouw bevinding is afgewezen. Bekijk de bevinding voor meer informatie.`,
+        issueId: id,
+        status: "OPEN",
+      },
+    });
   }
 
   return NextResponse.json({ success: true });
