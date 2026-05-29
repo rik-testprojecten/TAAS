@@ -11,6 +11,7 @@ const createSchema = z.object({
   afterStepId: z.string().optional(),
   beforeStepId: z.string().optional(),
   assigneeIds: z.array(z.string()).optional(),
+  attachmentIds: z.array(z.string()).optional(),
 });
 
 export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -81,6 +82,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     await prisma.flowStepAssignee.createMany({
       data: parsed.data.assigneeIds.map((userId) => ({ flowStepId: step.id, userId, tenantId })),
       skipDuplicates: true,
+    });
+  }
+
+  if (parsed.data.attachmentIds && parsed.data.attachmentIds.length > 0) {
+    await prisma.attachment.updateMany({
+      where: { id: { in: parsed.data.attachmentIds }, tenantId, flowStepId: null, runStepId: null, issueId: null },
+      data: { flowStepId: step.id },
     });
   }
 

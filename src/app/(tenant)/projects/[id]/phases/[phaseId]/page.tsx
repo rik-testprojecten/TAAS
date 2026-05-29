@@ -608,7 +608,7 @@ export default function PhasePage() {
                   <div className="border-t border-slate-100 px-5 py-3 flex gap-4">
                     {latestVersion.runs.slice(0, 3).map((run: any) => (
                       <Link key={run.id} href={`/runs/${run.id}`} className="flex items-center gap-2 text-xs hover:text-primary-600">
-                        <span className={`badge ${STATUS_COLORS[run.status]}`}>{run.status.replace("_", " ")}</span>
+                        <span className={`badge ${STATUS_COLORS[run.status]}`}>{RUN_STATUS_LABELS[run.status] ?? run.status}</span>
                         <span className="text-slate-500">{run.name}</span>
                       </Link>
                     ))}

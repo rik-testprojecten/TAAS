@@ -9,6 +9,7 @@ const updateSchema = z.object({
   expectedResult: z.string().optional(),
   isArchived: z.boolean().optional(),
   assigneeIds: z.array(z.string()).optional(),
+  attachmentIds: z.array(z.string()).optional(),
 });
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -27,7 +28,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const parsed = updateSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
-  const { assigneeIds, ...stepData } = parsed.data;
+  const { assigneeIds, attachmentIds, ...stepData } = parsed.data;
 
   if (Object.keys(stepData).length > 0) {
     await prisma.flowStep.update({ where: { id }, data: stepData });
@@ -43,9 +44,19 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
   }
 
+  if (Array.isArray(attachmentIds) && attachmentIds.length > 0) {
+    await prisma.attachment.updateMany({
+      where: { id: { in: attachmentIds }, tenantId, flowStepId: null, runStepId: null, issueId: null },
+      data: { flowStepId: id },
+    });
+  }
+
   const updated = await prisma.flowStep.findFirst({
     where: { id },
-    include: { assignees: { include: { user: { select: { id: true, name: true } } } } },
+    include: {
+      assignees: { include: { user: { select: { id: true, name: true } } } },
+      attachments: { select: { id: true, fileName: true, sizeBytes: true } },
+    },
   });
   return NextResponse.json(updated);
 }

@@ -12,7 +12,15 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
   const run = await prisma.testRun.findFirst({
     where: { id, tenantId },
     include: {
-      flowVersion: { include: { flow: { include: { phase: { include: { project: true } } } } } },
+      flowVersion: {
+        include: {
+          flow: { include: { phase: { include: { project: true } } } },
+          steps: {
+            where: { isArchived: false },
+            select: { id: true, order: true, attachments: { select: { id: true, fileName: true, sizeBytes: true } } },
+          },
+        },
+      },
       steps: {
         orderBy: { order: "asc" },
         include: {

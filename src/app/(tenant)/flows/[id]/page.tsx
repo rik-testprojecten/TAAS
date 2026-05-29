@@ -3,11 +3,12 @@ import { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useToast } from "@/components/Toast";
+import { AttachmentUploader, AttachmentList, type AttachmentMeta } from "@/components/AttachmentUploader";
 
 type InsertPosition = { type: "before" | "after" | "end"; stepId?: string };
-type StepForm = { title: string; instruction: string; expectedResult: string; assigneeIds: string[] };
+type StepForm = { title: string; instruction: string; expectedResult: string; assigneeIds: string[]; attachments: AttachmentMeta[] };
 
-const EMPTY_NEW_FORM: StepForm = { title: "", instruction: "", expectedResult: "", assigneeIds: [] };
+const EMPTY_NEW_FORM: StepForm = { title: "", instruction: "", expectedResult: "", assigneeIds: [], attachments: [] };
 
 function AssigneePills({
   users,
@@ -100,6 +101,13 @@ function NewStepForm({
           onChange={(e) => onFormChange({ ...form, expectedResult: e.target.value })}
         />
         <AssigneePills users={users} selected={form.assigneeIds} onToggle={onToggle} />
+        <div>
+          <label className="block text-xs font-medium text-slate-600 mb-2">Bijlagen</label>
+          <AttachmentUploader
+            value={form.attachments}
+            onChange={(v) => onFormChange({ ...form, attachments: v })}
+          />
+        </div>
         <div className="flex gap-2 pt-1">
           <button
             onClick={onAdd}
@@ -189,10 +197,12 @@ export default function FlowBuilderPage() {
 
   async function saveStep(stepId: string) {
     setSaving(true);
+    const { existingAttachments, newAttachments, ...rest } = editForm;
+    const body = { ...rest, attachmentIds: (newAttachments as AttachmentMeta[]).map((a) => a.id) };
     const res = await fetch(`/api/flowSteps/${stepId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(editForm),
+      body: JSON.stringify(body),
     });
     setEditingStep(null);
     await load();
@@ -216,6 +226,7 @@ export default function FlowBuilderPage() {
       instruction: newStepForm.instruction,
       expectedResult: newStepForm.expectedResult,
       assigneeIds: newStepForm.assigneeIds,
+      attachmentIds: newStepForm.attachments.map((a) => a.id),
     };
     if (insertPos?.type === "after" && insertPos.stepId) body.afterStepId = insertPos.stepId;
     if (insertPos?.type === "before" && insertPos.stepId) body.beforeStepId = insertPos.stepId;
@@ -378,6 +389,8 @@ export default function FlowBuilderPage() {
       instruction: step.instruction,
       expectedResult: step.expectedResult ?? "",
       assigneeIds: step.assignees?.map((a: any) => a.userId) ?? [],
+      existingAttachments: (step.attachments ?? []) as AttachmentMeta[],
+      newAttachments: [] as AttachmentMeta[],
     });
   }
 
@@ -624,6 +637,18 @@ export default function FlowBuilderPage() {
                       <textarea className="input resize-none" rows={2} value={editForm.expectedResult || ""} onChange={(e) => setEditForm({ ...editForm, expectedResult: e.target.value })} />
                     </div>
                     <AssigneePills users={tenantUsers} selected={editForm.assigneeIds ?? []} onToggle={toggleInEdit} />
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-2">Bijlagen</label>
+                      {(editForm.existingAttachments ?? []).length > 0 && (
+                        <div className="mb-2">
+                          <AttachmentList attachments={editForm.existingAttachments} />
+                        </div>
+                      )}
+                      <AttachmentUploader
+                        value={editForm.newAttachments ?? []}
+                        onChange={(v: AttachmentMeta[]) => setEditForm({ ...editForm, newAttachments: v })}
+                      />
+                    </div>
                     <div className="flex gap-2 pt-1">
                       <button onClick={() => saveStep(step.id)} disabled={saving} className="btn-primary text-sm">
                         {saving ? (
@@ -708,6 +733,11 @@ export default function FlowBuilderPage() {
                               {a.user.name}
                             </span>
                           ))}
+                        </div>
+                      )}
+                      {step.attachments?.length > 0 && (
+                        <div className="mt-2">
+                          <AttachmentList attachments={step.attachments} />
                         </div>
                       )}
                     </div>

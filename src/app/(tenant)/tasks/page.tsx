@@ -13,6 +13,7 @@ type Task = {
   description?: string;
   runStep?: { run?: { name?: string; flowVersion?: { flow?: { phase?: { project?: { name: string } } } } }; name?: string } | null;
   issue?: { id: string; title: string; impact?: string } | null;
+  previousStep?: { byName: string | null; title: string } | null;
 };
 
 const TYPE_ICONS: Record<string, string> = { STEP_EXECUTION: "🧪", RETEST: "🔄", QUESTION: "❓" };
@@ -143,6 +144,14 @@ export default function TasksPage() {
                   <h3 className="font-medium text-slate-900">{task.title}</h3>
                   {project && (
                     <div className="text-xs text-slate-400 mt-1">{project.name} — {run?.name}</div>
+                  )}
+                  {task.previousStep?.byName && (
+                    <div className="text-xs text-slate-500 mt-1 flex items-center gap-1">
+                      <svg className="w-3 h-3 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3" />
+                      </svg>
+                      Van: <span className="font-medium text-slate-600">{task.previousStep.byName}</span>
+                    </div>
                   )}
                   {task.issue && (
                     <div className="text-xs text-primary-600 mt-1">
