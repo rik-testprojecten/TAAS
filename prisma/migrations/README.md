@@ -1,14 +1,28 @@
 # Database migrations
 
-This project uses **Prisma Migrate**. The deploy runs `scripts/db-migrate-deploy.mjs`,
-which applies pending migrations on every deploy.
+This project uses **Prisma Migrate** for migration history. Previously the schema was
+managed ad hoc with `prisma db push` (migrations were even gitignored), which is why
+the `RunStep.parentRunStepId` / `threadInitiatorId` and `Attachment.flowStepId` columns
+existed in `schema.prisma` but were missing from the deployed database (Prisma error
+**P2022**).
 
-Previously the schema was managed ad hoc with `prisma db push` (migrations were even
-gitignored), which is why the `RunStep.parentRunStepId` / `threadInitiatorId` and
-`Attachment.flowStepId` columns existed in `schema.prisma` but were missing from the
-deployed database (Prisma error **P2022**).
+## How the schema is kept in sync on Vercel
 
-## Deploying — fully automatic, nothing to do by hand
+On Vercel, **`DATABASE_URL` is not available during the build**, so migrations cannot
+run as part of the build step. Instead the app reconciles the missing columns **at
+runtime**, when the database connection exists, via the Next.js instrumentation hook
+(`src/instrumentation.ts`). It runs once when a server instance boots: a fast pre-check
+short-circuits when the columns are already present, otherwise it applies them
+idempotently. This is what actually fixed the P2022 error in the deployed app.
+
+The migration files below remain the source of truth for the schema and are used for
+local development and for any environment where a database connection *is* available at
+deploy time (see the manual `db:migrate` script section).
+
+## Applying migrations where a DATABASE_URL is available (manual / CI)
+
+`npm run db:migrate` runs `scripts/db-migrate-deploy.mjs`, which is safe and fully
+automatic when `DATABASE_URL` is set:
 
 The deploy step (`scripts/db-migrate-deploy.mjs`) detects what kind of database it is
 talking to and does the right thing. You do **not** need to run any manual database
