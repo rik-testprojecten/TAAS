@@ -11,28 +11,57 @@ const IMPACT_ORDER: Record<string, number> = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, 
 
 type SortField = "impact" | "createdAt" | "status";
 type SortDir = "asc" | "desc";
+type ViewTab = "open" | "resolved" | "rejected" | "withdrawn" | "wishlist";
+
+const TABS: { id: ViewTab; label: string; icon?: boolean }[] = [
+  { id: "open", label: "Open bevindingen" },
+  { id: "resolved", label: "Opgelost" },
+  { id: "rejected", label: "Afgewezen" },
+  { id: "withdrawn", label: "Ingetrokken" },
+  { id: "wishlist", label: "Wenslijst", icon: true },
+];
 
 export default function IssuesPage() {
   const toast = useToast();
   const [issues, setIssues] = useState<Issue[]>([]);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<"all" | "wishlist">("all");
-  const [filters, setFilters] = useState({ status: "", type: "", impact: "" });
+  const [view, setView] = useState<ViewTab>("open");
+  const [filters, setFilters] = useState({ type: "", impact: "" });
   const [sortField, setSortField] = useState<SortField>("createdAt");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
   const load = useCallback(async () => {
+    setLoading(true);
     const params = new URLSearchParams();
-    if (filters.status) params.set("status", filters.status);
-    // In de wenslijst-weergave forceren we type WISH; anders het gekozen typefilter
-    if (view === "wishlist") params.set("type", "WISH");
-    else if (filters.type) params.set("type", filters.type);
+
+    if (view === "wishlist") {
+      params.set("type", "WISH");
+    } else if (view === "resolved") {
+      params.set("status", "RESOLVED");
+    } else if (view === "rejected") {
+      params.set("status", "REJECTED");
+    } else if (view === "withdrawn") {
+      params.set("status", "WITHDRAWN");
+    }
+
+    if (view !== "wishlist" && filters.type) params.set("type", filters.type);
     if (filters.impact) params.set("impact", filters.impact);
     try {
       const res = await fetch(`/api/issues?${params}`);
       if (!res.ok) throw new Error();
-      const data = await res.json();
-      setIssues(Array.isArray(data) ? data : []);
+      let data = await res.json();
+      if (!Array.isArray(data)) data = [];
+
+      // Wensen worden uitgesloten uit alle bevindingen-views
+      if (view !== "wishlist") {
+        data = data.filter((i: Issue) => i.type !== "WISH");
+      }
+      // Open-tab toont alleen actieve statussen
+      if (view === "open") {
+        data = data.filter((i: Issue) => ["NEW", "IN_PROGRESS", "QUESTION"].includes(i.status));
+      }
+
+      setIssues(data);
     } catch {
       toast.error("Bevindingen konden niet worden geladen");
     } finally {
@@ -72,48 +101,45 @@ export default function IssuesPage() {
       : <svg className="w-3.5 h-3.5 text-primary-600 ml-1 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>;
   }
 
-  const criticalCount = issues.filter(i => i.impact === "CRITICAL" && !["RESOLVED","REJECTED"].includes(i.status)).length;
-  const blockerCount = issues.filter(i => i.type === "BLOCKER" && !["RESOLVED","REJECTED"].includes(i.status)).length;
+  const criticalCount = issues.filter(i => i.impact === "CRITICAL" && ["NEW", "IN_PROGRESS", "QUESTION"].includes(i.status)).length;
+  const blockerCount = issues.filter(i => i.type === "BLOCKER" && ["NEW", "IN_PROGRESS", "QUESTION"].includes(i.status)).length;
+
+  const pageTitle = view === "wishlist" ? "Wenslijst" : view === "resolved" ? "Opgeloste bevindingen" : view === "rejected" ? "Afgewezen bevindingen" : view === "withdrawn" ? "Ingetrokken bevindingen" : "Open bevindingen";
+  const countLabel = view === "wishlist"
+    ? `${issues.length} wens${issues.length !== 1 ? "en" : ""}`
+    : `${issues.length} bevinding${issues.length !== 1 ? "en" : ""}`;
 
   return (
     <div className="p-4 md:p-8">
       <header className="flex items-center justify-between mb-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">{view === "wishlist" ? "Wenslijst" : "Bevindingen"}</h1>
-          <p className="text-slate-500 text-sm mt-1">
-            {view === "wishlist"
-              ? `${issues.length} wens${issues.length !== 1 ? "en" : ""}`
-              : `${issues.length} bevinding${issues.length !== 1 ? "en" : ""}`}
-          </p>
+          <h1 className="text-2xl font-bold text-slate-900">{pageTitle}</h1>
+          <p className="text-slate-500 text-sm mt-1">{countLabel}</p>
         </div>
       </header>
 
-      {/* Weergave-tabs: alle bevindingen vs. wenslijst */}
-      <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 mb-5">
-        <button
-          onClick={() => setView("all")}
-          aria-pressed={view === "all"}
-          className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 ${
-            view === "all" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
-          }`}
-        >
-          Alle bevindingen
-        </button>
-        <button
-          onClick={() => setView("wishlist")}
-          aria-pressed={view === "wishlist"}
-          className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors flex items-center gap-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 ${
-            view === "wishlist" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
-          }`}
-        >
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-          </svg>
-          Wenslijst
-        </button>
+      {/* Tabs */}
+      <div className="flex flex-wrap gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1 mb-5 w-fit">
+        {TABS.map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => { setView(tab.id); setFilters({ type: "", impact: "" }); }}
+            aria-pressed={view === tab.id}
+            className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 ${
+              view === tab.id ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            {tab.icon && (
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+              </svg>
+            )}
+            {tab.label}
+          </button>
+        ))}
       </div>
 
-      {(criticalCount > 0 || blockerCount > 0) && (
+      {view === "open" && (criticalCount > 0 || blockerCount > 0) && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6 flex gap-6">
           {criticalCount > 0 && <span className="text-red-700 font-medium text-sm">{criticalCount} kritieke open issue{criticalCount !== 1 ? "s" : ""}</span>}
           {blockerCount > 0 && <span className="text-red-700 font-medium text-sm">{blockerCount} open blokkade{blockerCount !== 1 ? "s" : ""}</span>}
@@ -122,19 +148,10 @@ export default function IssuesPage() {
 
       {/* Filters + sortering */}
       <div className="card p-3 mb-5 flex flex-wrap gap-2 items-center">
-        <select aria-label="Filter op status" className="input w-auto text-sm" value={filters.status} onChange={e => setFilters({...filters, status: e.target.value})}>
-          <option value="">Alle statussen</option>
-          <option value="NEW">Nieuw</option>
-          <option value="IN_PROGRESS">In behandeling</option>
-          <option value="QUESTION">Vraag</option>
-          <option value="RESOLVED">Opgelost</option>
-          <option value="REJECTED">Afgewezen</option>
-        </select>
         {view !== "wishlist" && (
           <select aria-label="Filter op type" className="input w-auto text-sm" value={filters.type} onChange={e => setFilters({...filters, type: e.target.value})}>
             <option value="">Alle typen</option>
             <option value="BUG">Fout</option>
-            <option value="WISH">Wens</option>
             <option value="BLOCKER">Blokkade</option>
           </select>
         )}
@@ -153,12 +170,14 @@ export default function IssuesPage() {
           <button onClick={() => toggleSort("createdAt")} className={`px-2 py-1 rounded text-xs font-medium transition-colors ${sortField === "createdAt" ? "bg-primary-100 text-primary-700" : "hover:bg-slate-100"}`}>
             Datum <SortIcon field="createdAt" />
           </button>
-          <button onClick={() => toggleSort("status")} className={`px-2 py-1 rounded text-xs font-medium transition-colors ${sortField === "status" ? "bg-primary-100 text-primary-700" : "hover:bg-slate-100"}`}>
-            Status <SortIcon field="status" />
-          </button>
+          {view !== "open" && (
+            <button onClick={() => toggleSort("status")} className={`px-2 py-1 rounded text-xs font-medium transition-colors ${sortField === "status" ? "bg-primary-100 text-primary-700" : "hover:bg-slate-100"}`}>
+              Status <SortIcon field="status" />
+            </button>
+          )}
         </div>
-        {(filters.status || filters.type || filters.impact) && (
-          <button onClick={() => setFilters({ status: "", type: "", impact: "" })} className="text-sm text-slate-500 hover:text-slate-700">
+        {(filters.type || filters.impact) && (
+          <button onClick={() => setFilters({ type: "", impact: "" })} className="text-sm text-slate-500 hover:text-slate-700">
             Wis filters
           </button>
         )}
@@ -175,11 +194,13 @@ export default function IssuesPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
-            <p className="text-slate-700 font-medium">{view === "wishlist" ? "Geen wensen gevonden" : "Geen bevindingen gevonden"}</p>
+            <p className="text-slate-700 font-medium">
+              {view === "wishlist" ? "Geen wensen gevonden" : view === "open" ? "Geen open bevindingen" : view === "resolved" ? "Geen opgeloste bevindingen" : view === "rejected" ? "Geen afgewezen bevindingen" : "Geen ingetrokken bevindingen"}
+            </p>
             <p className="text-slate-400 text-sm mt-1">
               {view === "wishlist"
-                ? "Er staan nog geen wensen op de wenslijst. Zet een bevinding op de wenslijst door het type op 'Wens' te zetten."
-                : (filters.status || filters.type || filters.impact) ? "Probeer andere filteropties." : "Er zijn nog geen bevindingen geregistreerd."}
+                ? "Er staan nog geen wensen op de wenslijst. Markeer een bevinding als wens via de detailpagina."
+                : (filters.type || filters.impact) ? "Probeer andere filteropties." : view === "open" ? "Er zijn geen openstaande bevindingen." : "Er zijn geen bevindingen in deze categorie."}
             </p>
           </div>
         ) : sorted.map((issue) => {
@@ -205,9 +226,11 @@ export default function IssuesPage() {
                   <div className="text-xs text-slate-400 mt-1 flex gap-3 flex-wrap">
                     <span>Door: {issue.createdBy?.name}</span>
                     <span>{formatDateTime(issue.createdAt)}</span>
-                    <span className={sla.isOverdue ? "text-red-500 font-medium" : ""}>
-                      Open: {sla.ageLabel} {sla.isOverdue ? `(SLA: ${sla.slaDays}d)` : ""}
-                    </span>
+                    {view === "open" && (
+                      <span className={sla.isOverdue ? "text-red-500 font-medium" : ""}>
+                        Open: {sla.ageLabel} {sla.isOverdue ? `(SLA: ${sla.slaDays}d)` : ""}
+                      </span>
+                    )}
                     {(issue._count?.comments ?? 0) > 0 && <span>{issue._count!.comments} reactie{issue._count!.comments !== 1 ? "s" : ""}</span>}
                   </div>
                 </div>
