@@ -1,6 +1,14 @@
 export type Submodule = { key: string; label: string };
 export type Module = { key: string; label: string; emoji: string; submodules: Submodule[] };
 
+/**
+ * MODULES is the single source of truth for categories throughout the app.
+ * Main category = Module.key (e.g. "HRM", "FIN")
+ * Sub category  = Submodule.key (e.g. "HRM_DECLARATIES")
+ *
+ * Super admins edit this list to add/rename categories; all templates and
+ * client flows are categorised against this list.
+ */
 export const MODULES: Module[] = [
   {
     key: "HRM",
@@ -75,6 +83,12 @@ export const MODULES: Module[] = [
   },
 ];
 
+/** All valid main-category keys (e.g. "HRM", "FIN"). */
+export const MAIN_CATEGORY_KEYS = MODULES.map((m) => m.key) as [string, ...string[]];
+
+/** All valid sub-category keys (e.g. "HRM_DECLARATIES"). */
+export const SUB_CATEGORY_KEYS = MODULES.flatMap((m) => m.submodules.map((s) => s.key)) as [string, ...string[]];
+
 export function getModuleLabel(key: string): string {
   const m = MODULES.find((mod) => mod.key === key);
   return m ? `${m.emoji} ${m.label}` : key;
@@ -96,7 +110,6 @@ export type SubmoduleInfo = {
   emoji: string;
 };
 
-// Platte lijst van alle subonderdelen met hun bovenliggende module.
 export function getAllSubmodules(): SubmoduleInfo[] {
   return MODULES.flatMap((mod) =>
     mod.submodules.map((sub) => ({
@@ -112,4 +125,12 @@ export function getAllSubmodules(): SubmoduleInfo[] {
 export function getModuleKeyForSubmodule(submoduleKey: string): string | null {
   const mod = MODULES.find((m) => m.submodules.some((s) => s.key === submoduleKey));
   return mod ? mod.key : null;
+}
+
+export function getSubmodules(mainKey: string): Submodule[] {
+  return MODULES.find((m) => m.key === mainKey)?.submodules ?? [];
+}
+
+export function getParentModule(subKey: string): Module | null {
+  return MODULES.find((m) => m.submodules.some((s) => s.key === subKey)) ?? null;
 }

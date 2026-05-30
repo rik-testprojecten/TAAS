@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requirePlatformAuth } from "@/lib/api-helpers";
+import { MAIN_CATEGORY_KEYS, SUB_CATEGORY_KEYS } from "@/lib/modules";
 import { z } from "zod";
 
 const createSchema = z.object({
@@ -43,6 +44,15 @@ export async function POST(req: NextRequest) {
   const parsed = createSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
-  const template = await prisma.template.create({ data: parsed.data });
+  const { moduleLinks, ...templateData } = parsed.data;
+  const template = await prisma.template.create({
+    data: {
+      ...templateData,
+      moduleLinks: moduleLinks?.length
+        ? { create: moduleLinks.map((key) => ({ moduleKey: key })) }
+        : undefined,
+    },
+    include: { moduleLinks: { select: { moduleKey: true } } },
+  });
   return NextResponse.json(template, { status: 201 });
 }

@@ -40,49 +40,16 @@ enum PlatformRole {
 }
 
 model Template {
-  id             String   @id @default(cuid())
-  name           String
-  description    String?
-  isActive       Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id          String   @id @default(cuid())
+  name        String
+  category    String   @default("ALG")
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  mainCategoryId String?
-  subCategoryId  String?
-
-  mainCategory TemplateMainCategory? @relation(fields: [mainCategoryId], references: [id])
-  subCategory  TemplateSubCategory?  @relation(fields: [subCategoryId], references: [id])
-  versions     TemplateVersion[]
-  moduleLinks  TemplateModuleLink[]
-}
-
-model TemplateMainCategory {
-  id        String   @id @default(cuid())
-  name      String
-  slug      String   @unique
-  isActive  Boolean  @default(true)
-  order     Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  subCategories TemplateSubCategory[]
-  templates     Template[]
-}
-
-model TemplateSubCategory {
-  id             String   @id @default(cuid())
-  mainCategoryId String
-  name           String
-  slug           String
-  isActive       Boolean  @default(true)
-  order          Int      @default(0)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  mainCategory TemplateMainCategory @relation(fields: [mainCategoryId], references: [id], onDelete: Cascade)
-  templates    Template[]
-
-  @@unique([mainCategoryId, slug])
+  versions    TemplateVersion[]
+  moduleLinks TemplateModuleLink[]
 }
 
 model TemplateVersion {

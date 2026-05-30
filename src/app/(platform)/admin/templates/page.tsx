@@ -194,6 +194,7 @@ export default function TemplatesPage() {
         </div>
       </div>
 
+      {/* ── New template modal ── */}
       {showNew && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl p-6 w-full max-w-md">
@@ -226,6 +227,28 @@ export default function TemplatesPage() {
                   <option value="0">Concept — alleen zichtbaar voor super admin</option>
                 </select>
               </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Module-koppelingen</label>
+                <p className="text-xs text-slate-500 mb-2">Kies welke (sub)modules dit template activeren in de wizard.</p>
+                <div className="max-h-48 overflow-y-auto space-y-2 border border-slate-200 rounded-lg p-3">
+                  {MODULES.map(mod => (
+                    <div key={mod.key}>
+                      <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-1">
+                        <input type="checkbox" className="rounded" checked={form.moduleLinks.includes(mod.key)} onChange={() => setForm(f => ({...f, moduleLinks: toggleModuleLink(f.moduleLinks, mod.key)}))} />
+                        {mod.emoji} {mod.label}
+                      </label>
+                      <div className="ml-5 grid grid-cols-2 gap-x-4">
+                        {mod.submodules.map(sub => (
+                          <label key={sub.key} className="flex items-center gap-1.5 text-xs text-slate-600">
+                            <input type="checkbox" className="rounded" checked={form.moduleLinks.includes(sub.key)} onChange={() => setForm(f => ({...f, moduleLinks: toggleModuleLink(f.moduleLinks, sub.key)}))} />
+                            {sub.label}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
               <div className="flex gap-3 pt-2">
                 <button type="submit" disabled={saving} className="btn-primary flex-1">{saving ? "Opslaan..." : (editTemplateId ? "Opslaan" : "Aanmaken")}</button>
                 <button type="button" onClick={() => { setShowNew(false); setEditTemplateId(null); }} className="btn-secondary flex-1">Annuleren</button>
@@ -235,6 +258,7 @@ export default function TemplatesPage() {
         </div>
       )}
 
+      {/* ── Version modal ── */}
       {showVersionFor && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
           <div className="bg-white rounded-xl p-6 w-full max-w-2xl my-4">
@@ -397,8 +421,61 @@ export default function TemplatesPage() {
                 </div>
               </div>
             </div>
-          );
-        })}
+          ))}
+          {ungrouped.length > 0 && (
+            <div>
+              <h2 className="font-semibold text-slate-500 mb-3">Overig</h2>
+              <div className="grid gap-3">
+                {ungrouped.map((t) => (
+                  <div key={t.id} className="card p-5">
+                    <span className="font-medium">{t.name}</span>
+                    <span className="ml-2 text-xs text-slate-400">{t.mainCategory}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ModuleLinksEditor({ initialLinks, onSave, onCancel, saving }: {
+  initialLinks: string[];
+  onSave: (links: string[]) => void;
+  onCancel: () => void;
+  saving: boolean;
+}) {
+  const [links, setLinks] = useState<string[]>(initialLinks);
+
+  function toggle(key: string) {
+    setLinks(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="max-h-64 overflow-y-auto space-y-3 border border-slate-200 rounded-lg p-3">
+        {MODULES.map(mod => (
+          <div key={mod.key}>
+            <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-1">
+              <input type="checkbox" className="rounded" checked={links.includes(mod.key)} onChange={() => toggle(mod.key)} />
+              {mod.emoji} {mod.label}
+            </label>
+            <div className="ml-5 grid grid-cols-2 gap-x-4">
+              {mod.submodules.map(sub => (
+                <label key={sub.key} className="flex items-center gap-1.5 text-xs text-slate-600 py-0.5">
+                  <input type="checkbox" className="rounded" checked={links.includes(sub.key)} onChange={() => toggle(sub.key)} />
+                  {sub.label}
+                </label>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="flex gap-3">
+        <button onClick={() => onSave(links)} disabled={saving} className="btn-primary flex-1">{saving ? "Opslaan..." : "Opslaan"}</button>
+        <button onClick={onCancel} className="btn-secondary flex-1">Annuleren</button>
       </div>
 
       {totalPages > 1 && (

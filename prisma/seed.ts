@@ -1,11 +1,4 @@
 import { PrismaClient, PlatformRole, TenantRole } from "@prisma/client";
-
-const CATEGORY_SLUGS = {
-  HR: "cmcat-hr-0000000000000001",
-  FIN: "cmcat-fin-000000000000002",
-  INKOOP: "cmcat-ink-000000000000003",
-  ALG: "cmcat-alg-000000000000004",
-};
 import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
 
@@ -131,29 +124,13 @@ async function main() {
     },
   });
 
-  // Template-hoofdcategorieën (vaste id's gedeeld met schema-reconcile).
-  const mainCategories = [
-    { id: CATEGORY_SLUGS.HR, name: "HR", slug: "HR", order: 1 },
-    { id: CATEGORY_SLUGS.FIN, name: "Financieel", slug: "FIN", order: 2 },
-    { id: CATEGORY_SLUGS.INKOOP, name: "Inkoop", slug: "INKOOP", order: 3 },
-    { id: CATEGORY_SLUGS.ALG, name: "Algemeen", slug: "ALG", order: 4 },
-  ];
-  for (const c of mainCategories) {
-    await prisma.templateMainCategory.upsert({
-      where: { id: c.id },
-      update: {},
-      create: c,
-    });
-  }
-
-  // Templates
   const hrTemplate = await prisma.template.upsert({
     where: { id: "tpl-hr-instroom" },
     update: {},
     create: {
       id: "tpl-hr-instroom",
       name: "HR Instroom",
-      mainCategoryId: CATEGORY_SLUGS.HR,
+      category: "HRM",
       description: "Standaard testflow voor HR Instroom processen in AFAS",
     },
   });
@@ -203,8 +180,7 @@ async function main() {
     create: {
       id: "tpl-fin-inkoop",
       name: "Financieel Inkoopproces",
-      mainCategoryId: CATEGORY_SLUGS.FIN,
-      description: "Standaard testflow voor het inkoopproces (aanvraag → opdracht → factuur)",
+category: "FIN",      description: "Standaard testflow voor het inkoopproces (aanvraag → opdracht → factuur)",
     },
   });
 
@@ -247,19 +223,26 @@ async function main() {
     },
   });
 
-  // Koppel templates aan subonderdelen (modules), zodat de onboarding en het
-  // later inlezen alleen de relevante templates tonen. Keys verwijzen naar
-  // src/lib/modules.ts.
-  await prisma.templateModuleLink.createMany({
-    data: [
-      { templateId: hrTemplate.id, moduleKey: "HRM_ONBOARDING" },
-      { templateId: hrTemplate.id, moduleKey: "HRM_DOSSIER" },
-      { templateId: hrTemplate.id, moduleKey: "HRM_SALARIS" },
-      { templateId: finTemplate.id, moduleKey: "LOG_INKOOP" },
-      { templateId: finTemplate.id, moduleKey: "FIN_DEBCRED" },
-    ],
-    skipDuplicates: true,
+// Module links — which modules activate each template in the wizard
+  await prisma.templateModuleLink.upsert({
+    where: { templateId_moduleKey: { templateId: hrTemplate.id, moduleKey: "HRM" } },
+    update: {},
+    create: { templateId: hrTemplate.id, moduleKey: "HRM" },
   });
+  await prisma.templateModuleLink.upsert({
+    where: { templateId_moduleKey: { templateId: hrTemplate.id, moduleKey: "HRM_DOSSIER" } },
+    update: {},
+    create: { templateId: hrTemplate.id, moduleKey: "HRM_DOSSIER" },
+  });
+  await prisma.templateModuleLink.upsert({
+    where: { templateId_moduleKey: { templateId: finTemplate.id, moduleKey: "FIN" } },
+    update: {},
+    create: { templateId: finTemplate.id, moduleKey: "FIN" },
+  });
+  await prisma.templateModuleLink.upsert({
+    where: { templateId_moduleKey: { templateId: finTemplate.id, moduleKey: "FIN_FACTURATIE" } },
+    update: {},
+    create: { templateId: finTemplate.id, moduleKey: "FIN_FACTURATIE" },  });
 
   console.log("Seed completed!");
   console.log("Accounts created (passwords come from SEED_*_PASSWORD env vars,");

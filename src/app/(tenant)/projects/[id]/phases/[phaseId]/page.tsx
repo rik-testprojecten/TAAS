@@ -989,7 +989,7 @@ export default function PhasePage() {
                 }} required>
                   <option value="">Selecteer template...</option>
                   {allTemplateVersions.map((v: any) => (
-                    <option key={v.id} value={v.id}>{v.templateName} — {v.version} ({v.category})</option>
+                    <option key={v.id} value={v.id}>{v.templateName} — {v.version} ({getModuleLabel(v.mainCategory)}{v.subCategory ? ` › ${getSubmoduleLabel(v.subCategory)}` : ""})</option>
                   ))}
                 </select>
               </div>
