@@ -60,7 +60,11 @@ export default function PhasePage() {
 
   useEffect(() => {
     load();
-    fetch("/api/platform/templates")
+    // Gebruik het tenant-endpoint: /api/platform/templates is afgeschermd voor
+    // platform-beheerders, waardoor een klant-admin een 403 kreeg en de knop
+    // "Template importeren" nooit verscheen. /api/templates geeft de actieve
+    // sjablonen + versies terug voor de ingelogde klant.
+    fetch("/api/templates")
       .then(r => r.json())
       .then(d => setTemplates(Array.isArray(d) ? d : []))
       .catch(() => toast.error("Sjablonen konden niet worden geladen"));
