@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { ensureSchema } from "@/lib/schema-reconcile";
+import { getTenantLoginCandidates } from "@/lib/login-queries";
+import { logger } from "@/lib/logger";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 
@@ -37,45 +38,48 @@ export async function POST(req: NextRequest) {
   }
   const { email, password } = parsed.data;
 
-  // Zorg dat de blokkeer-/2FA-kolommen bestaan voordat we Tenant/TenantUser
-  // bevragen (voorkomt P2022 op een via `db push` aangemaakte database).
-  await ensureSchema();
+  try {
+    const accounts: ResolvedAccount[] = [];
 
-  const accounts: ResolvedAccount[] = [];
-
-  // Platform-gebruiker
-  const platformUser = await prisma.platformUser.findUnique({ where: { email } });
-  if (platformUser && platformUser.isActive) {
-    if (await bcrypt.compare(password, platformUser.password)) {
-      accounts.push({ type: "platform", id: "platform", label: "Rhoost Platform" });
+    // Platform-gebruiker (raakt geen reconcilieerbare kolommen).
+    const platformUser = await prisma.platformUser.findUnique({ where: { email } });
+    if (platformUser && platformUser.isActive) {
+      if (await bcrypt.compare(password, platformUser.password)) {
+        accounts.push({ type: "platform", id: "platform", label: "Rhoost Platform" });
+      }
     }
-  }
 
-  // Klant-gebruikers — kan meerdere klanten betreffen met hetzelfde e-mailadres
-  const tenantUsers = await prisma.tenantUser.findMany({
-    where: { email, isActive: true, isBlocked: false },
-    include: { tenant: { select: { id: true, name: true, isActive: true, mfaRequired: true } } },
-  });
-  for (const tu of tenantUsers) {
-    if (!tu.tenant.isActive) continue;
-    if (await bcrypt.compare(password, tu.password)) {
-      accounts.push({
-        type: "tenant",
-        id: tu.id,
-        tenantId: tu.tenant.id,
-        label: tu.tenant.name,
-        mfaRequired: tu.tenant.mfaRequired,
-        mfaEnrolled: tu.mfaEnabled && !!tu.mfaSecret,
-      });
+    // Klant-gebruikers — kan meerdere klanten betreffen met hetzelfde e-mailadres.
+    const candidates = await getTenantLoginCandidates(email);
+    for (const c of candidates) {
+      if (c.isBlocked || !c.tenantActive) continue;
+      if (await bcrypt.compare(password, c.password)) {
+        accounts.push({
+          type: "tenant",
+          id: c.id,
+          tenantId: c.tenantId,
+          label: c.tenantName,
+          mfaRequired: c.mfaRequired,
+          mfaEnrolled: c.mfaEnabled && !!c.mfaSecret,
+        });
+      }
     }
-  }
 
-  if (accounts.length === 0) {
+    if (accounts.length === 0) {
+      return NextResponse.json(
+        { error: "Ongeldig e-mailadres of wachtwoord" },
+        { status: 401 }
+      );
+    }
+
+    return NextResponse.json({ accounts });
+  } catch (err) {
+    // Onderscheid serverfouten van een echte mismatch zodat dit niet als
+    // "ongeldig wachtwoord" wordt gemaskeerd.
+    logger.error(err, "Login resolve failed");
     return NextResponse.json(
-      { error: "Ongeldig e-mailadres of wachtwoord" },
-      { status: 401 }
+      { error: "Inloggen is tijdelijk niet mogelijk door een serverfout. Probeer het zo opnieuw." },
+      { status: 503 }
     );
   }
-
-  return NextResponse.json({ accounts });
 }
