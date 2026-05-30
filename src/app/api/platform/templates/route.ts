@@ -5,19 +5,35 @@ import { z } from "zod";
 
 const createSchema = z.object({
   name: z.string().min(2),
-  category: z.enum(["HR", "FIN", "INKOOP", "ALG"]),
+  mainCategoryId: z.string().optional(),
+  subCategoryId: z.string().optional(),
   description: z.string().optional(),
 });
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const result = await requirePlatformAuth();
   if ("error" in result) return result.error;
 
-  const templates = await prisma.template.findMany({
-    include: { versions: { orderBy: { createdAt: "desc" }, take: 1 } },
-    orderBy: { name: "asc" },
-  });
-  return NextResponse.json(templates);
+  const { searchParams } = new URL(req.url);
+  const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10));
+  const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get("pageSize") ?? "25", 10)));
+  const skip = (page - 1) * pageSize;
+
+  const [templates, total] = await Promise.all([
+    prisma.template.findMany({
+      include: {
+        versions: { orderBy: { createdAt: "desc" }, take: 1 },
+        mainCategory: { select: { id: true, name: true, slug: true } },
+        subCategory: { select: { id: true, name: true, slug: true } },
+      },
+      orderBy: { name: "asc" },
+      skip,
+      take: pageSize,
+    }),
+    prisma.template.count(),
+  ]);
+
+  return NextResponse.json({ data: templates, total, page, pageSize });
 }
 
 export async function POST(req: NextRequest) {

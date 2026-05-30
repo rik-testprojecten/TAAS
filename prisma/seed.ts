@@ -1,4 +1,11 @@
-import { PrismaClient, PlatformRole, TenantRole, TemplateCategory } from "@prisma/client";
+import { PrismaClient, PlatformRole, TenantRole } from "@prisma/client";
+
+const CATEGORY_SLUGS = {
+  HR: "cmcat-hr-0000000000000001",
+  FIN: "cmcat-fin-000000000000002",
+  INKOOP: "cmcat-ink-000000000000003",
+  ALG: "cmcat-alg-000000000000004",
+};
 import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
 
@@ -131,7 +138,7 @@ async function main() {
     create: {
       id: "tpl-hr-instroom",
       name: "HR Instroom",
-      category: TemplateCategory.HR,
+      mainCategoryId: CATEGORY_SLUGS.HR,
       description: "Standaard testflow voor HR Instroom processen in AFAS",
     },
   });
@@ -181,7 +188,7 @@ async function main() {
     create: {
       id: "tpl-fin-inkoop",
       name: "Financieel Inkoopproces",
-      category: TemplateCategory.FIN,
+      mainCategoryId: CATEGORY_SLUGS.FIN,
       description: "Standaard testflow voor het inkoopproces (aanvraag → opdracht → factuur)",
     },
   });
