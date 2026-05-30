@@ -111,11 +111,10 @@ export default function LoginPage() {
     const data = await res.json();
     const list: ResolvedAccount[] = data.accounts;
     setAccounts(list);
-    if (list.length === 1) {
-      await proceedWithAccount(list[0]);
-    } else {
-      setStep("select");
-    }
+    // Altijd de klant-selectiestap tonen — ook bij één account — zodat de
+    // gebruiker bewust een omgeving kiest vóórdat de onboarding-wizard kan
+    // verschijnen. Auto-proceed bij één match sloeg die keuze ten onrechte over.
+    setStep("select");
   }
 
   async function handleTotp(e: React.FormEvent) {
@@ -201,7 +200,7 @@ export default function LoginPage() {
         {step === "select" && (
           <div className="space-y-4">
             <p className="text-sm text-slate-600">
-              Dit e-mailadres is bekend bij meerdere omgevingen. Kies bij welke u wilt inloggen.
+              Kies bij welke omgeving u wilt inloggen.
             </p>
             <div className="space-y-2">
               {accounts.map((acc) => (
