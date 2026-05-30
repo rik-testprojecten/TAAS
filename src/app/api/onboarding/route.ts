@@ -112,6 +112,7 @@ export async function POST(req: NextRequest) {
       for (const templateId of selectedTemplates) {
         const templateVersion = await prisma.templateVersion.findFirst({
           where: { templateId, isActive: true },
+          orderBy: { createdAt: "desc" },
           include: { steps: { orderBy: { order: "asc" } }, template: true },
         });
         if (!templateVersion) continue;

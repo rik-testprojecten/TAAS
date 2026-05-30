@@ -247,6 +247,20 @@ async function main() {
     },
   });
 
+  // Koppel templates aan subonderdelen (modules), zodat de onboarding en het
+  // later inlezen alleen de relevante templates tonen. Keys verwijzen naar
+  // src/lib/modules.ts.
+  await prisma.templateModuleLink.createMany({
+    data: [
+      { templateId: hrTemplate.id, moduleKey: "HRM_ONBOARDING" },
+      { templateId: hrTemplate.id, moduleKey: "HRM_DOSSIER" },
+      { templateId: hrTemplate.id, moduleKey: "HRM_SALARIS" },
+      { templateId: finTemplate.id, moduleKey: "LOG_INKOOP" },
+      { templateId: finTemplate.id, moduleKey: "FIN_DEBCRED" },
+    ],
+    skipDuplicates: true,
+  });
+
   console.log("Seed completed!");
   console.log("Accounts created (passwords come from SEED_*_PASSWORD env vars,");
   console.log("or were randomly generated — reset them via the set-password flow):");

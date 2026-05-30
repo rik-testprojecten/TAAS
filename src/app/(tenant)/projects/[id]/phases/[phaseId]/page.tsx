@@ -60,10 +60,8 @@ export default function PhasePage() {
 
   useEffect(() => {
     load();
-    // Gebruik het tenant-endpoint: /api/platform/templates is afgeschermd voor
-    // platform-beheerders, waardoor een klant-admin een 403 kreeg en de knop
-    // "Template importeren" nooit verscheen. /api/templates geeft de actieve
-    // sjablonen + versies terug voor de ingelogde klant.
+    // Tenant-endpoint: filtert op de bij onboarding gekozen modules en levert
+    // per template de nieuwste actieve versie.
     fetch("/api/templates")
       .then(r => r.json())
       .then(d => setTemplates(Array.isArray(d) ? d : []))
@@ -939,7 +937,10 @@ export default function PhasePage() {
       {showImport && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl p-6 w-full max-w-md">
-            <h2 className="font-semibold text-lg mb-4">Template importeren als flow</h2>
+            <h2 className="font-semibold text-lg mb-1">Template importeren als flow</h2>
+            <p className="text-sm text-slate-500 mb-4">
+              Je ziet de templates die horen bij de modules die bij de onboarding gekozen zijn. Er wordt steeds de nieuwste versie ingelezen als een nieuwe flow; bestaande flows blijven ongewijzigd.
+            </p>
             <form onSubmit={importTemplate} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-1">Flow naam *</label>
