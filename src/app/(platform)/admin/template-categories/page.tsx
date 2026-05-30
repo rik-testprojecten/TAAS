@@ -7,6 +7,7 @@ type MainCategory = { id: string; name: string; slug: string; isActive: boolean;
 export default function TemplateCategoriesPage() {
   const [categories, setCategories] = useState<MainCategory[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const [showNewMain, setShowNewMain] = useState(false);
@@ -23,10 +24,19 @@ export default function TemplateCategoriesPage() {
   useEffect(() => { load(); }, []);
 
   async function load() {
-    const res = await fetch("/api/platform/template-categories");
-    const data = await res.json();
-    setCategories(Array.isArray(data) ? data : []);
-    setLoading(false);
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/platform/template-categories");
+      if (!res.ok) throw new Error(`Server gaf status ${res.status}`);
+      const data = await res.json();
+      setCategories(Array.isArray(data) ? data : []);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Laden mislukt");
+      setCategories([]);
+    } finally {
+      setLoading(false);
+    }
   }
 
   function toggleExpanded(id: string) {
@@ -162,9 +172,15 @@ export default function TemplateCategoriesPage() {
       )}
 
       <div className="space-y-3">
-        {categories.length === 0 && (
+        {error ? (
+          <div className="card p-8 text-center text-sm">
+            <p className="text-red-600 font-medium">Categorieën konden niet geladen worden</p>
+            <p className="text-slate-400 mt-1">{error}</p>
+            <button onClick={() => load()} className="btn-secondary text-sm mt-4">Opnieuw proberen</button>
+          </div>
+        ) : categories.length === 0 ? (
           <div className="card p-12 text-center text-slate-400 text-sm">Nog geen categorieën</div>
-        )}
+        ) : null}
         {categories.map((cat) => (
           <div key={cat.id} className="card">
             <div className="p-4 flex items-center gap-3">

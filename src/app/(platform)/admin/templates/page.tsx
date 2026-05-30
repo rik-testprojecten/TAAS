@@ -18,6 +18,7 @@ export default function TemplatesPage() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const [categories, setCategories] = useState<MainCategory[]>([]);
 
@@ -29,19 +30,28 @@ export default function TemplatesPage() {
 
   const load = useCallback(async (p = page) => {
     setLoading(true);
-    const res = await fetch(`/api/platform/templates?page=${p}&pageSize=${PAGE_SIZE}`);
-    const data = await res.json();
-    setTemplates(Array.isArray(data.data) ? data.data : []);
-    setTotal(data.total ?? 0);
-    setLoading(false);
+    setError(null);
+    try {
+      const res = await fetch(`/api/platform/templates?page=${p}&pageSize=${PAGE_SIZE}`);
+      if (!res.ok) throw new Error(`Server gaf status ${res.status}`);
+      const data = await res.json();
+      setTemplates(Array.isArray(data.data) ? data.data : []);
+      setTotal(data.total ?? 0);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Laden mislukt");
+      setTemplates([]);
+    } finally {
+      setLoading(false);
+    }
   }, [page]);
 
   useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
     fetch("/api/platform/template-categories")
-      .then(r => r.json())
-      .then(d => setCategories(Array.isArray(d) ? d : []));
+      .then(r => (r.ok ? r.json() : []))
+      .then(d => setCategories(Array.isArray(d) ? d : []))
+      .catch(() => setCategories([]));
   }, []);
 
   const selectedMain = categories.find(c => c.id === form.mainCategoryId);
@@ -200,6 +210,12 @@ export default function TemplatesPage() {
       <div className="grid gap-4">
         {loading ? (
           <div className="card p-8 text-center text-slate-400 text-sm">Laden...</div>
+        ) : error ? (
+          <div className="card p-8 text-center text-sm">
+            <p className="text-red-600 font-medium">Templates konden niet geladen worden</p>
+            <p className="text-slate-400 mt-1">{error}</p>
+            <button onClick={() => load()} className="btn-secondary text-sm mt-4">Opnieuw proberen</button>
+          </div>
         ) : templates.length === 0 ? (
           <div className="card p-12 text-center text-slate-400 text-sm">Nog geen templates</div>
         ) : templates.map((t) => {

@@ -62,6 +62,10 @@ export async function requirePlatformAuth(
   if (session.user.userType !== "platform") {
     return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
   }
+  // Zorg dat reconcilieerbare tabellen/kolommen (o.a. de template-categorieën)
+  // bestaan voordat platformroutes ze bevragen — voorkomt P2021/P2022 op een via
+  // `db push` aangemaakte database, ook als de boot-hook hier niet gedraaid heeft.
+  await ensureSchema();
   if (allowedRoles && allowedRoles.length > 0) {
     const hasRole = allowedRoles.some((r) => session.user.roles.includes(r));
     if (!hasRole) {
