@@ -3,7 +3,9 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { cn, TENANT_ROLE_LABELS } from "@/lib/utils";
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
+import { Modal } from "@/components/Modal";
+import { Field } from "@/components/Field";
 
 type NavItem = { href: string; label: string; icon: React.ReactNode };
 
@@ -186,84 +188,74 @@ function SidebarContent({
       </div>
 
       {/* Settings modal */}
-      {showSettings && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setShowSettings(false)} />
-          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="font-semibold text-slate-800">Naam en logo</h2>
-              <button onClick={() => setShowSettings(false)} className="text-slate-400 hover:text-slate-600">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Organisatienaam</label>
-              <input
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300"
-                value={settingsForm.orgName}
-                onChange={(e) => setSettingsForm({ ...settingsForm, orgName: e.target.value })}
-                placeholder="Organisatienaam"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Logo</label>
-              <div className="flex items-center gap-3">
-                {settingsForm.logoBase64 ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={settingsForm.logoBase64} alt="Logo preview" className="w-14 h-14 rounded-lg object-contain border border-slate-200 bg-slate-50 p-1" />
-                ) : (
-                  <div className="w-14 h-14 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 text-xs border border-slate-200">Geen</div>
-                )}
-                <div className="space-y-1.5">
+      <Modal
+        open={showSettings}
+        onClose={() => setShowSettings(false)}
+        title="Naam en logo"
+        size="sm"
+        footer={
+          <>
+            <button type="button" className="btn-secondary" onClick={() => setShowSettings(false)}>
+              Annuleren
+            </button>
+            <button type="button" className="btn-primary" onClick={saveSettings} disabled={settingsSaving}>
+              {settingsSaving ? "Opslaan..." : "Opslaan"}
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <Field
+            label="Organisatienaam"
+            value={settingsForm.orgName}
+            onChange={(e) => setSettingsForm({ ...settingsForm, orgName: e.target.value })}
+            placeholder="Organisatienaam"
+          />
+          <div>
+            <span className="label">Logo</span>
+            <div className="flex items-center gap-3">
+              {settingsForm.logoBase64 ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={settingsForm.logoBase64} alt="Voorbeeld van het organisatielogo" className="w-14 h-14 rounded-lg object-contain border border-slate-200 bg-slate-50 p-1" />
+              ) : (
+                <div className="w-14 h-14 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 text-xs border border-slate-200">Geen</div>
+              )}
+              <div className="space-y-1.5">
+                <button
+                  type="button"
+                  onClick={() => logoInputRef.current?.click()}
+                  className="text-sm text-primary-600 border border-primary-200 px-3 py-1.5 rounded-lg hover:bg-primary-50 transition-colors block w-full text-center focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-400"
+                >
+                  Logo uploaden
+                </button>
+                {settingsForm.logoBase64 && (
                   <button
                     type="button"
-                    onClick={() => logoInputRef.current?.click()}
-                    className="text-sm text-primary-600 border border-primary-200 px-3 py-1.5 rounded-lg hover:bg-primary-50 transition-colors block w-full text-center"
+                    onClick={() => setSettingsForm({ ...settingsForm, logoBase64: "" })}
+                    className="text-xs text-red-500 hover:text-red-700 block w-full text-center"
                   >
-                    Logo uploaden
+                    Logo verwijderen
                   </button>
-                  {settingsForm.logoBase64 && (
-                    <button
-                      type="button"
-                      onClick={() => setSettingsForm({ ...settingsForm, logoBase64: "" })}
-                      className="text-xs text-red-500 hover:text-red-700 block w-full text-center"
-                    >
-                      Logo verwijderen
-                    </button>
-                  )}
-                </div>
+                )}
               </div>
-              <input
-                ref={logoInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={async (e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  const b64 = await compressLogo(file);
-                  setSettingsForm({ ...settingsForm, logoBase64: b64 });
-                  e.target.value = "";
-                }}
-              />
             </div>
-            <div className="flex gap-2 pt-1">
-              <button
-                onClick={saveSettings}
-                disabled={settingsSaving}
-                className="flex-1 bg-primary-600 text-white text-sm font-medium py-2 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
-              >
-                {settingsSaving ? "Opslaan..." : "Opslaan"}
-              </button>
-              <button onClick={() => setShowSettings(false)} className="flex-1 border border-slate-200 text-slate-600 text-sm py-2 rounded-lg hover:bg-slate-50 transition-colors">
-                Annuleren
-              </button>
-            </div>
+            <input
+              ref={logoInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              aria-label="Logobestand kiezen"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const b64 = await compressLogo(file);
+                setSettingsForm({ ...settingsForm, logoBase64: b64 });
+                e.target.value = "";
+              }}
+            />
           </div>
         </div>
-      )}
+      </Modal>
 
       {/* Zoekbalk */}
       <div className="px-3 py-2 border-b border-forest-900">

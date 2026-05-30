@@ -42,14 +42,14 @@ export default async function DashboardPage() {
 
     return (
       <div className="p-8 max-w-2xl">
-        <div className="mb-8">
+        <header className="mb-8">
           <h1 className="text-2xl font-bold text-slate-900">Welkom, {session!.user.name}</h1>
           <p className="text-slate-500 text-sm mt-1">
             {myTasks.length === 0
               ? "Je hebt geen openstaande taken. Goed bezig!"
               : `Je hebt ${myTasks.length} openstaande taak${myTasks.length !== 1 ? "en" : ""}.`}
           </p>
-        </div>
+        </header>
 
         {myTasks.length > 0 && (
           <div>
@@ -167,16 +167,16 @@ export default async function DashboardPage() {
 
   return (
     <div className="p-4 md:p-8">
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
           <p className="text-slate-500 text-sm mt-1">Welkom terug, {session!.user.name}</p>
         </div>
         {settings?.logoBase64 && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={settings.logoBase64} alt="Logo" className="h-12 w-auto object-contain shrink-0 self-start" />
+          <img src={settings.logoBase64} alt="Organisatielogo" className="h-12 w-auto object-contain shrink-0 self-start" />
         )}
-      </div>
+      </header>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">

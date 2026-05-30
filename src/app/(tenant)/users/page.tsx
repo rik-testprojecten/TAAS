@@ -2,6 +2,10 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { HelpButton } from "@/components/HelpButton";
+import { Modal } from "@/components/Modal";
+import { Field } from "@/components/Field";
+import { TableSkeleton } from "@/components/Skeleton";
+import { useToast } from "@/components/Toast";
 
 const ROLE_LABELS: Record<string, string> = {
   TENANT_ADMIN: "Beheerder",
@@ -12,10 +16,13 @@ const ROLE_LABELS: Record<string, string> = {
 
 const ALL_ROLES = Object.keys(ROLE_LABELS);
 
+type User = { id: string; name: string; email: string; roles: string[]; isActive: boolean; isBlocked?: boolean; mfaEnabled?: boolean };
+
 export default function UsersPage() {
   const { data: session } = useSession();
   const currentUserId = session?.user?.id;
-  const [users, setUsers] = useState<any[]>([]);
+  const toast = useToast();
+  const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNew, setShowNew] = useState(false);
   const [form, setForm] = useState({ name: "", email: "", password: "", roles: ["TESTER"] as string[], sendInvite: true });
@@ -30,17 +37,27 @@ export default function UsersPage() {
   useEffect(() => { load(); loadSettings(); }, []);
 
   async function load() {
-    const res = await fetch("/api/users");
-    const data = await res.json();
-    setUsers(Array.isArray(data) ? data : []);
-    setLoading(false);
+    try {
+      const res = await fetch("/api/users");
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setUsers(Array.isArray(data) ? data : []);
+    } catch {
+      toast.error("Gebruikers konden niet worden geladen");
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function loadSettings() {
-    const res = await fetch("/api/settings");
-    if (res.ok) {
-      const data = await res.json();
-      if (data.emailDomain) setEmailDomain(data.emailDomain);
+    try {
+      const res = await fetch("/api/settings");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.emailDomain) setEmailDomain(data.emailDomain);
+      }
+    } catch {
+      // Niet-kritisch: e-maildomein is optioneel.
     }
   }
 
@@ -48,33 +65,41 @@ export default function UsersPage() {
     e.preventDefault();
     setSaving(true);
     setError("");
-    const res = await fetch("/api/users", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      if (form.sendInvite) setInviteResult({ sent: data.inviteSent });
-      setShowNew(false);
-      setForm({ name: "", email: "", password: "", roles: ["TESTER"], sendInvite: true });
-      load();
-    } else {
-      const data = await res.json();
-      setError(data.error || "Er is een fout opgetreden");
+    try {
+      const res = await fetch("/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (form.sendInvite) setInviteResult({ sent: data.inviteSent });
+        setShowNew(false);
+        setForm({ name: "", email: "", password: "", roles: ["TESTER"], sendInvite: true });
+        toast.success("Gebruiker toegevoegd");
+        load();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || "Er is een fout opgetreden");
+      }
+    } catch {
+      setError("Netwerkfout — probeer het opnieuw");
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   }
 
   async function toggleBlocked(userId: string, isBlocked: boolean) {
     try {
-      await fetch(`/api/users/${userId}`, {
+      const res = await fetch(`/api/users/${userId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isBlocked: !isBlocked }),
       });
+      if (!res.ok) throw new Error();
+      toast.success(isBlocked ? "Gebruiker gedeblokkeerd" : "Gebruiker geblokkeerd");
     } catch {
-      // Fout negeren, herlaad altijd
+      toast.error("Wijzigen van status mislukt");
     }
     await load();
   }
@@ -94,19 +119,25 @@ export default function UsersPage() {
     if (!editUser) return;
     setEditSaving(true);
     setEditError("");
-    const res = await fetch(`/api/users/${editUser.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: editUser.name, roles: editUser.roles }),
-    });
-    if (res.ok) {
-      setEditUser(null);
-      await load();
-    } else {
-      const data = await res.json();
-      setEditError(data.error || "Er is een fout opgetreden");
+    try {
+      const res = await fetch(`/api/users/${editUser.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: editUser.name, roles: editUser.roles }),
+      });
+      if (res.ok) {
+        setEditUser(null);
+        toast.success("Gebruiker bijgewerkt");
+        await load();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setEditError(data.error || "Er is een fout opgetreden");
+      }
+    } catch {
+      setEditError("Netwerkfout — probeer het opnieuw");
+    } finally {
+      setEditSaving(false);
     }
-    setEditSaving(false);
   }
 
   function toggleRole(role: string) {
@@ -116,204 +147,234 @@ export default function UsersPage() {
     }));
   }
 
-  if (loading) return <div className="p-8 text-slate-500">Laden...</div>;
-
   return (
     <div className="p-4 md:p-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Gebruikers</h1>
           <p className="text-slate-500 text-sm mt-1">{users.length} gebruiker{users.length !== 1 ? "s" : ""}</p>
         </div>
         <button onClick={() => setShowNew(true)} className="btn-primary flex items-center gap-2 self-start sm:self-auto">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
           Gebruiker toevoegen
         </button>
-      </div>
-
-      {showNew && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl p-6 w-full max-w-md">
-            <h2 className="font-semibold text-lg mb-4">Gebruiker toevoegen</h2>
-            <form onSubmit={create} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Naam *</label>
-                <input className="input" value={form.name} onChange={e => setForm({...form, name: e.target.value})} required placeholder="Jan Jansen" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">E-mailadres *</label>
-                <input
-                  type="email"
-                  className="input"
-                  value={form.email}
-                  onChange={e => setForm({...form, email: e.target.value})}
-                  required
-                  placeholder={emailDomain ? `naam@${emailDomain}` : "jan@organisatie.nl"}
-                />
-                {emailDomain && !form.email.includes("@") && form.email.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setForm(prev => ({ ...prev, email: prev.email + "@" + emailDomain }))}
-                    className="mt-1 text-xs text-primary-600 hover:text-primary-800"
-                  >
-                    + @{emailDomain} toevoegen
-                  </button>
-                )}
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Tijdelijk wachtwoord *</label>
-                <input type="password" className="input" value={form.password} onChange={e => setForm({...form, password: e.target.value})} required placeholder="Min. 8 tekens" minLength={8} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">Rollen *</label>
-                <div className="space-y-2">
-                  {Object.entries(ROLE_LABELS).map(([value, label]) => (
-                    <label key={value} className="flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={form.roles.includes(value)}
-                        onChange={() => toggleRole(value)}
-                        className="rounded"
-                      />
-                      {label}
-                    </label>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label className="flex items-center gap-2 text-sm cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={form.sendInvite}
-                    onChange={(e) => setForm({ ...form, sendInvite: e.target.checked })}
-                    className="rounded"
-                  />
-                  <span>Uitnodigings-e-mail versturen</span>
-                </label>
-                <p className="text-xs text-slate-400 mt-1 ml-6">Vereist dat SMTP is ingesteld in de omgevingsvariabelen.</p>
-              </div>
-              {error && <div className="text-red-600 text-sm bg-red-50 px-3 py-2 rounded">{error}</div>}
-              <div className="flex gap-3 pt-2">
-                <button type="submit" disabled={saving || form.roles.length === 0} className="btn-primary flex-1">{saving ? "Toevoegen..." : "Toevoegen"}</button>
-                <button type="button" onClick={() => setShowNew(false)} className="btn-secondary flex-1">Annuleren</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      </header>
 
       {inviteResult && (
-        <div className={`mb-4 p-4 rounded-xl border flex items-center justify-between text-sm ${inviteResult.sent ? "bg-green-50 border-green-200 text-green-800" : "bg-amber-50 border-amber-200 text-amber-800"}`}>
+        <div
+          role="status"
+          className={`mb-4 p-4 rounded-xl border flex items-center justify-between text-sm ${inviteResult.sent ? "bg-green-50 border-green-200 text-green-800" : "bg-amber-50 border-amber-200 text-amber-800"}`}
+        >
           <span>{inviteResult.sent ? "Uitnodigings-e-mail verstuurd." : "Gebruiker aangemaakt, maar e-mail kon niet verstuurd worden. Controleer SMTP-instellingen."}</span>
-          <button onClick={() => setInviteResult(null)} className="ml-4 opacity-60 hover:opacity-100">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          <button onClick={() => setInviteResult(null)} aria-label="Melding sluiten" className="ml-4 opacity-60 hover:opacity-100">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
       )}
 
-      <div className="card">
-        <div className="divide-y divide-slate-100">
-          {users.map((user) => (
-            <div key={user.id} className={`flex items-center justify-between p-4 ${user.isBlocked ? "bg-red-50/40" : ""}`}>
-              <div className="flex items-center gap-3">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-medium text-sm ${user.isBlocked ? "bg-red-100 text-red-700" : "bg-primary-100 text-primary-700"}`}>
-                  {user.name.charAt(0).toUpperCase()}
-                </div>
-                <div>
-                  <div className="font-medium text-slate-900 text-sm flex items-center gap-2">
-                    {user.name}
-                    {user.isBlocked && (
-                      <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-normal">Geblokkeerd</span>
-                    )}
-                    {user.mfaEnabled && (
-                      <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-normal" title="Twee-factor-authenticatie actief">2FA</span>
-                    )}
-                  </div>
-                  <div className="text-xs text-slate-400">{user.email}</div>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="flex gap-1 flex-wrap justify-end max-w-xs">
-                  {user.roles.map((r: string) => (
-                    <span key={r} className="text-xs bg-primary-50 text-primary-700 px-2 py-0.5 rounded">{ROLE_LABELS[r] || r}</span>
-                  ))}
-                </div>
-                <button
-                  onClick={() => setEditUser({ id: user.id, name: user.name, roles: user.roles })}
-                  className="text-xs px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
-                >
-                  Bewerken
-                </button>
-                {user.id !== currentUserId && (
-                  <>
-                    <button
-                      onClick={() => toggleBlocked(user.id, user.isBlocked)}
-                      className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${user.isBlocked ? "border-green-200 text-green-700 hover:bg-green-50" : "border-amber-200 text-amber-700 hover:bg-amber-50"}`}
-                    >
-                      {user.isBlocked ? "Deblokkeren" : "Blokkeren"}
-                    </button>
-                    <button
-                      onClick={() => removeUser(user.id, user.name)}
-                      className="text-xs px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-red-50 hover:text-red-700 hover:border-red-200 transition-colors"
-                    >
-                      Verwijderen
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Gebruiker bewerken modal */}
-      {editUser && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl p-6 w-full max-w-md">
-            <h2 className="font-semibold text-lg mb-4">Gebruiker bewerken</h2>
-            <form onSubmit={saveEdit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Naam *</label>
-                <input
-                  className="input"
-                  value={editUser.name}
-                  onChange={e => setEditUser({ ...editUser, name: e.target.value })}
-                  required
-                  minLength={2}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">Rollen *</label>
-                <div className="space-y-2">
-                  {ALL_ROLES.map((role) => (
-                    <label key={role} className="flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={editUser.roles.includes(role)}
-                        onChange={() => setEditUser({
-                          ...editUser,
-                          roles: editUser.roles.includes(role)
-                            ? editUser.roles.filter(r => r !== role)
-                            : [...editUser.roles, role],
-                        })}
-                        className="rounded"
-                      />
-                      {ROLE_LABELS[role]}
-                    </label>
-                  ))}
-                </div>
-              </div>
-              {editError && <div className="text-red-600 text-sm bg-red-50 px-3 py-2 rounded">{editError}</div>}
-              <div className="flex gap-3 pt-2">
-                <button type="submit" disabled={editSaving || editUser.roles.length === 0} className="btn-primary flex-1">
-                  {editSaving ? "Opslaan..." : "Opslaan"}
-                </button>
-                <button type="button" onClick={() => setEditUser(null)} className="btn-secondary flex-1">Annuleren</button>
-              </div>
-            </form>
-          </div>
+      {loading ? (
+        <TableSkeleton rows={5} cols={3} />
+      ) : users.length === 0 ? (
+        <div className="card p-8 text-center text-slate-500">Nog geen gebruikers.</div>
+      ) : (
+        <div className="card overflow-x-auto">
+          <table className="data-table">
+            <caption className="sr-only">Lijst van gebruikers met hun rollen en status</caption>
+            <thead>
+              <tr>
+                <th scope="col">Gebruiker</th>
+                <th scope="col" className="hidden sm:table-cell">Rollen</th>
+                <th scope="col"><span className="sr-only">Acties</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.map((user) => (
+                <tr key={user.id} className={user.isBlocked ? "bg-red-50/40" : ""}>
+                  <td>
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-medium text-sm shrink-0 ${user.isBlocked ? "bg-red-100 text-red-700" : "bg-primary-100 text-primary-700"}`} aria-hidden="true">
+                        {user.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="font-medium text-slate-900 text-sm truncate flex items-center gap-2">
+                          {user.name}
+                          {user.isBlocked && (
+                            <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-normal">Geblokkeerd</span>
+                          )}
+                          {user.mfaEnabled && (
+                            <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-normal" title="Twee-factor-authenticatie actief">2FA</span>
+                          )}
+                        </div>
+                        <div className="text-xs text-slate-400 truncate">{user.email}</div>
+                        <div className="flex gap-1 flex-wrap mt-1 sm:hidden">
+                          {user.roles.map((r) => (
+                            <span key={r} className="text-xs bg-primary-50 text-primary-700 px-2 py-0.5 rounded">{ROLE_LABELS[r] || r}</span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="hidden sm:table-cell">
+                    <div className="flex gap-1 flex-wrap">
+                      {user.roles.map((r) => (
+                        <span key={r} className="text-xs bg-primary-50 text-primary-700 px-2 py-0.5 rounded">{ROLE_LABELS[r] || r}</span>
+                      ))}
+                    </div>
+                  </td>
+                  <td>
+                    <div className="flex items-center gap-2 justify-end">
+                      <button
+                        onClick={() => setEditUser({ id: user.id, name: user.name, roles: user.roles })}
+                        className="btn-secondary !px-3 !py-1.5 text-xs"
+                      >
+                        Bewerken
+                      </button>
+                      {user.id !== currentUserId && (
+                        <>
+                          <button
+                            onClick={() => toggleBlocked(user.id, !!user.isBlocked)}
+                            className={`text-xs px-3 py-1.5 rounded-lg border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 ${user.isBlocked ? "border-green-200 text-green-700 hover:bg-green-50" : "border-amber-200 text-amber-700 hover:bg-amber-50"}`}
+                          >
+                            {user.isBlocked ? "Deblokkeren" : "Blokkeren"}
+                          </button>
+                          <button
+                            onClick={() => removeUser(user.id, user.name)}
+                            className="text-xs px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-red-50 hover:text-red-700 hover:border-red-200 transition-colors"
+                          >
+                            Verwijderen
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
+
+      {/* Nieuwe gebruiker */}
+      <Modal
+        open={showNew}
+        onClose={() => setShowNew(false)}
+        title="Gebruiker toevoegen"
+        footer={
+          <>
+            <button type="button" onClick={() => setShowNew(false)} className="btn-secondary">Annuleren</button>
+            <button type="submit" form="new-user-form" disabled={saving || form.roles.length === 0} className="btn-primary">
+              {saving ? "Toevoegen..." : "Toevoegen"}
+            </button>
+          </>
+        }
+      >
+        <form id="new-user-form" onSubmit={create} className="space-y-4">
+          <Field
+            label="Naam"
+            required
+            value={form.name}
+            onChange={e => setForm({ ...form, name: e.target.value })}
+            placeholder="Jan Jansen"
+          />
+          <div>
+            <Field
+              label="E-mailadres"
+              type="email"
+              required
+              value={form.email}
+              onChange={e => setForm({ ...form, email: e.target.value })}
+              placeholder={emailDomain ? `naam@${emailDomain}` : "jan@organisatie.nl"}
+            />
+            {emailDomain && !form.email.includes("@") && form.email.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setForm(prev => ({ ...prev, email: prev.email + "@" + emailDomain }))}
+                className="mt-1 text-xs text-primary-600 hover:text-primary-800"
+              >
+                + @{emailDomain} toevoegen
+              </button>
+            )}
+          </div>
+          <Field
+            label="Tijdelijk wachtwoord"
+            type="password"
+            required
+            minLength={8}
+            value={form.password}
+            onChange={e => setForm({ ...form, password: e.target.value })}
+            placeholder="Min. 8 tekens"
+            hint="De gebruiker kan dit later zelf wijzigen via de uitnodigingslink."
+          />
+          <fieldset>
+            <legend className="label">Rollen *</legend>
+            <div className="space-y-2">
+              {Object.entries(ROLE_LABELS).map(([value, label]) => (
+                <label key={value} className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" checked={form.roles.includes(value)} onChange={() => toggleRole(value)} className="rounded" />
+                  {label}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+          <div>
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input type="checkbox" checked={form.sendInvite} onChange={(e) => setForm({ ...form, sendInvite: e.target.checked })} className="rounded" />
+              <span>Uitnodigings-e-mail versturen</span>
+            </label>
+            <p className="field-hint ml-6">Vereist dat SMTP is ingesteld in de omgevingsvariabelen.</p>
+          </div>
+          {error && <div role="alert" className="text-red-600 text-sm bg-red-50 px-3 py-2 rounded">{error}</div>}
+        </form>
+      </Modal>
+
+      {/* Gebruiker bewerken */}
+      <Modal
+        open={!!editUser}
+        onClose={() => setEditUser(null)}
+        title="Gebruiker bewerken"
+        footer={
+          <>
+            <button type="button" onClick={() => setEditUser(null)} className="btn-secondary">Annuleren</button>
+            <button type="submit" form="edit-user-form" disabled={editSaving || !editUser || editUser.roles.length === 0} className="btn-primary">
+              {editSaving ? "Opslaan..." : "Opslaan"}
+            </button>
+          </>
+        }
+      >
+        {editUser && (
+          <form id="edit-user-form" onSubmit={saveEdit} className="space-y-4">
+            <Field
+              label="Naam"
+              required
+              minLength={2}
+              value={editUser.name}
+              onChange={e => setEditUser({ ...editUser, name: e.target.value })}
+            />
+            <fieldset>
+              <legend className="label">Rollen *</legend>
+              <div className="space-y-2">
+                {ALL_ROLES.map((role) => (
+                  <label key={role} className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={editUser.roles.includes(role)}
+                      onChange={() => setEditUser({
+                        ...editUser,
+                        roles: editUser.roles.includes(role)
+                          ? editUser.roles.filter(r => r !== role)
+                          : [...editUser.roles, role],
+                      })}
+                      className="rounded"
+                    />
+                    {ROLE_LABELS[role]}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+            {editError && <div role="alert" className="text-red-600 text-sm bg-red-50 px-3 py-2 rounded">{editError}</div>}
+          </form>
+        )}
+      </Modal>
 
       <HelpButton pageKey="users" />
     </div>

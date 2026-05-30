@@ -1,8 +1,10 @@
 "use client";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { STATUS_COLORS, IMPACT_COLORS, ISSUE_TYPE_LABELS, ISSUE_IMPACT_LABELS, ISSUE_STATUS_LABELS, formatDateTime, getIssueSlaInfo } from "@/lib/utils";
 import { HelpButton } from "@/components/HelpButton";
+import { CardGridSkeleton } from "@/components/Skeleton";
+import { useToast } from "@/components/Toast";
 import type { Issue } from "@/types";
 
 const IMPACT_ORDER: Record<string, number> = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
@@ -11,6 +13,7 @@ type SortField = "impact" | "createdAt" | "status";
 type SortDir = "asc" | "desc";
 
 export default function IssuesPage() {
+  const toast = useToast();
   const [issues, setIssues] = useState<Issue[]>([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<"all" | "wishlist">("all");
@@ -18,20 +21,26 @@ export default function IssuesPage() {
   const [sortField, setSortField] = useState<SortField>("createdAt");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
-  useEffect(() => { load(); }, [filters, view]);
-
-  async function load() {
+  const load = useCallback(async () => {
     const params = new URLSearchParams();
     if (filters.status) params.set("status", filters.status);
     // In de wenslijst-weergave forceren we type WISH; anders het gekozen typefilter
     if (view === "wishlist") params.set("type", "WISH");
     else if (filters.type) params.set("type", filters.type);
     if (filters.impact) params.set("impact", filters.impact);
-    const res = await fetch(`/api/issues?${params}`);
-    const data = await res.json();
-    setIssues(Array.isArray(data) ? data : []);
-    setLoading(false);
-  }
+    try {
+      const res = await fetch(`/api/issues?${params}`);
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setIssues(Array.isArray(data) ? data : []);
+    } catch {
+      toast.error("Bevindingen konden niet worden geladen");
+    } finally {
+      setLoading(false);
+    }
+  }, [filters, view, toast]);
+
+  useEffect(() => { load(); }, [load]);
 
   function toggleSort(field: SortField) {
     if (sortField === field) {
@@ -66,11 +75,9 @@ export default function IssuesPage() {
   const criticalCount = issues.filter(i => i.impact === "CRITICAL" && !["RESOLVED","REJECTED"].includes(i.status)).length;
   const blockerCount = issues.filter(i => i.type === "BLOCKER" && !["RESOLVED","REJECTED"].includes(i.status)).length;
 
-  if (loading) return <div className="p-8 text-slate-500">Laden...</div>;
-
   return (
     <div className="p-4 md:p-8">
-      <div className="flex items-center justify-between mb-4">
+      <header className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">{view === "wishlist" ? "Wenslijst" : "Bevindingen"}</h1>
           <p className="text-slate-500 text-sm mt-1">
@@ -79,13 +86,14 @@ export default function IssuesPage() {
               : `${issues.length} bevinding${issues.length !== 1 ? "en" : ""}`}
           </p>
         </div>
-      </div>
+      </header>
 
       {/* Weergave-tabs: alle bevindingen vs. wenslijst */}
       <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 mb-5">
         <button
           onClick={() => setView("all")}
-          className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
+          aria-pressed={view === "all"}
+          className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 ${
             view === "all" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
           }`}
         >
@@ -93,7 +101,8 @@ export default function IssuesPage() {
         </button>
         <button
           onClick={() => setView("wishlist")}
-          className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors flex items-center gap-1.5 ${
+          aria-pressed={view === "wishlist"}
+          className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors flex items-center gap-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 ${
             view === "wishlist" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
           }`}
         >
@@ -113,7 +122,7 @@ export default function IssuesPage() {
 
       {/* Filters + sortering */}
       <div className="card p-3 mb-5 flex flex-wrap gap-2 items-center">
-        <select className="input w-auto text-sm" value={filters.status} onChange={e => setFilters({...filters, status: e.target.value})}>
+        <select aria-label="Filter op status" className="input w-auto text-sm" value={filters.status} onChange={e => setFilters({...filters, status: e.target.value})}>
           <option value="">Alle statussen</option>
           <option value="NEW">Nieuw</option>
           <option value="IN_PROGRESS">In behandeling</option>
@@ -122,14 +131,14 @@ export default function IssuesPage() {
           <option value="REJECTED">Afgewezen</option>
         </select>
         {view !== "wishlist" && (
-          <select className="input w-auto text-sm" value={filters.type} onChange={e => setFilters({...filters, type: e.target.value})}>
+          <select aria-label="Filter op type" className="input w-auto text-sm" value={filters.type} onChange={e => setFilters({...filters, type: e.target.value})}>
             <option value="">Alle typen</option>
             <option value="BUG">Fout</option>
             <option value="WISH">Wens</option>
             <option value="BLOCKER">Blokkade</option>
           </select>
         )}
-        <select className="input w-auto text-sm" value={filters.impact} onChange={e => setFilters({...filters, impact: e.target.value})}>
+        <select aria-label="Filter op impact" className="input w-auto text-sm" value={filters.impact} onChange={e => setFilters({...filters, impact: e.target.value})}>
           <option value="">Alle impacts</option>
           <option value="CRITICAL">Kritiek</option>
           <option value="HIGH">Hoog</option>
@@ -155,6 +164,9 @@ export default function IssuesPage() {
         )}
       </div>
 
+      {loading ? (
+        <CardGridSkeleton count={6} />
+      ) : (
       <div className="space-y-3">
         {issues.length === 0 ? (
           <div className="card p-12 text-center">
@@ -205,6 +217,7 @@ export default function IssuesPage() {
           );
         })}
       </div>
+      )}
       <HelpButton pageKey="issues" />
     </div>
   );

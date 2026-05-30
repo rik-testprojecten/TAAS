@@ -1,6 +1,8 @@
 "use client";
 import { useState, useEffect } from "react";
 import { HelpButton } from "@/components/HelpButton";
+import { CardGridSkeleton } from "@/components/Skeleton";
+import { useToast } from "@/components/Toast";
 
 const PHASE_LABELS: Record<string, string> = {
   FAT: "Functionele Acceptatietest",
@@ -9,6 +11,7 @@ const PHASE_LABELS: Record<string, string> = {
 };
 
 export default function ReportsPage() {
+  const toast = useToast();
   const [projects, setProjects] = useState<import("@/types").Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState<string | null>(null);
@@ -19,9 +22,10 @@ export default function ReportsPage() {
       .then((r) => r.json())
       .then((d) => {
         setProjects(Array.isArray(d) ? d : []);
-        setLoading(false);
-      });
-  }, []);
+      })
+      .catch(() => toast.error("Projecten konden niet worden geladen"))
+      .finally(() => setLoading(false));
+  }, [toast]);
 
   async function generateReport(type: string, entityId: string, entityName: string) {
     const key = `${type}-${entityId}`;
@@ -47,24 +51,36 @@ export default function ReportsPage() {
       a.download = match?.[1] || `rapport-${Date.now()}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
+    } catch {
+      setError("Netwerkfout bij genereren rapport");
     } finally {
       setGenerating(null);
     }
   }
 
-  if (loading) return <div className="p-4 md:p-8 text-slate-500">Laden...</div>;
+  if (loading) {
+    return (
+      <div className="p-4 md:p-8 max-w-4xl">
+        <header className="mb-6">
+          <h1 className="text-2xl font-bold text-slate-900">Rapportages</h1>
+          <p className="text-slate-500 text-sm mt-1">Genereer professionele PDF-rapportages voor stuurgroep en oplevering</p>
+        </header>
+        <CardGridSkeleton count={3} />
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 md:p-8 max-w-4xl">
-      <div className="mb-6">
+      <header className="mb-6">
         <h1 className="text-2xl font-bold text-slate-900">Rapportages</h1>
         <p className="text-slate-500 text-sm mt-1">
           Genereer professionele PDF-rapportages voor stuurgroep en oplevering
         </p>
-      </div>
+      </header>
 
       {error && (
-        <div className="mb-6 bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700 flex items-start gap-3">
+        <div role="alert" className="mb-6 bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700 flex items-start gap-3">
           <svg className="w-5 h-5 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>

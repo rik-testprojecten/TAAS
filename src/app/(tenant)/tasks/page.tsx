@@ -1,8 +1,10 @@
 "use client";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { STATUS_COLORS, TASK_TYPE_LABELS, TASK_STATUS_LABELS, IMPACT_COLORS, ISSUE_IMPACT_LABELS, formatDateTime } from "@/lib/utils";
 import { HelpButton } from "@/components/HelpButton";
+import { CardGridSkeleton } from "@/components/Skeleton";
+import { useToast } from "@/components/Toast";
 
 type Task = {
   id: string;
@@ -19,19 +21,26 @@ type Task = {
 const TYPE_ICONS: Record<string, string> = { STEP_EXECUTION: "🧪", RETEST: "🔄", QUESTION: "❓" };
 
 export default function TasksPage() {
+  const toast = useToast();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState("");
   const [filterType, setFilterType] = useState("");
 
-  useEffect(() => { load(); }, []);
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch("/api/tasks");
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setTasks(Array.isArray(data) ? data : []);
+    } catch {
+      toast.error("Taken konden niet worden geladen");
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
 
-  async function load() {
-    const res = await fetch("/api/tasks");
-    const data = await res.json();
-    setTasks(Array.isArray(data) ? data : []);
-    setLoading(false);
-  }
+  useEffect(() => { load(); }, [load]);
 
   const filtered = useMemo(() => {
     return tasks.filter((t) => {
@@ -43,21 +52,20 @@ export default function TasksPage() {
 
   const hasFilters = filterStatus || filterType;
 
-  if (loading) return <div className="p-8 text-slate-500">Laden...</div>;
-
   return (
     <div className="p-4 md:p-8">
-      <div className="mb-6">
+      <header className="mb-6">
         <h1 className="text-2xl font-bold text-slate-900">Mijn Taken</h1>
         <p className="text-slate-500 text-sm mt-1">
           {filtered.length} van {tasks.length} taak{tasks.length !== 1 ? "en" : ""}
         </p>
-      </div>
+      </header>
 
       {/* Filters */}
-      {tasks.length > 0 && (
+      {!loading && tasks.length > 0 && (
         <div className="card p-3 mb-5 flex flex-wrap gap-2 items-center">
           <select
+            aria-label="Filter op status"
             className="input w-auto text-sm"
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
@@ -68,6 +76,7 @@ export default function TasksPage() {
             <option value="DONE">Afgerond</option>
           </select>
           <select
+            aria-label="Filter op type"
             className="input w-auto text-sm"
             value={filterType}
             onChange={(e) => setFilterType(e.target.value)}
@@ -88,6 +97,9 @@ export default function TasksPage() {
         </div>
       )}
 
+      {loading ? (
+        <CardGridSkeleton count={4} />
+      ) : (
       <div className="space-y-3">
         {tasks.length === 0 ? (
           <div className="card p-12 text-center">
@@ -173,6 +185,7 @@ export default function TasksPage() {
           );
         })}
       </div>
+      )}
       <HelpButton pageKey="tasks" />
     </div>
   );

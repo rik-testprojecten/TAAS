@@ -6,7 +6,12 @@ export default auth((req) => {
   const session = req.auth;
 
   // Allow public paths
-  if (pathname === "/login" || pathname.startsWith("/api/auth")) {
+  if (
+    pathname === "/login" ||
+    pathname === "/set-password" ||
+    pathname.startsWith("/api/auth") ||
+    pathname === "/api/account/set-password"
+  ) {
     return NextResponse.next();
   }
 

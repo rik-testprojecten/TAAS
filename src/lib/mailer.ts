@@ -26,11 +26,13 @@ const APP_URL = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
 export async function sendInviteMail(opts: {
   to: string;
   name: string;
-  tempPassword: string;
+  setPasswordToken: string;
   tenantName: string;
 }): Promise<boolean> {
   const transport = getTransport();
   if (!transport) return false;
+
+  const setPasswordUrl = `${APP_URL}/set-password?token=${encodeURIComponent(opts.setPasswordToken)}`;
 
   try {
     await transport.sendMail({
@@ -46,15 +48,12 @@ export async function sendInviteMail(opts: {
           <div style="background: white; border: 1px solid #e2e8f0; border-top: none; padding: 32px; border-radius: 0 0 12px 12px;">
             <p>Hoi ${opts.name},</p>
             <p>Je bent uitgenodigd om deel te nemen aan het testbeheerplatform van <strong>${opts.tenantName}</strong>.</p>
-            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin: 20px 0;">
-              <p style="margin: 0 0 8px; font-size: 13px; color: #64748b;">Inloggegevens</p>
-              <p style="margin: 0; font-size: 14px;"><strong>E-mail:</strong> ${opts.to}</p>
-              <p style="margin: 4px 0 0; font-size: 14px;"><strong>Tijdelijk wachtwoord:</strong> <code style="background: #e2e8f0; padding: 2px 6px; border-radius: 4px;">${opts.tempPassword}</code></p>
-            </div>
-            <a href="${APP_URL}/login" style="display: block; background: #2563eb; color: white; text-align: center; padding: 12px; border-radius: 8px; text-decoration: none; font-weight: 600; margin: 20px 0;">
-              Inloggen
+            <p style="font-size: 14px;">Klik op de knop hieronder om je eigen wachtwoord in te stellen. Deze link is 7 dagen geldig.</p>
+            <a href="${setPasswordUrl}" style="display: block; background: #2563eb; color: white; text-align: center; padding: 12px; border-radius: 8px; text-decoration: none; font-weight: 600; margin: 20px 0;">
+              Wachtwoord instellen
             </a>
-            <p style="font-size: 12px; color: #94a3b8;">Wijzig je wachtwoord na het eerste inloggen. Stuur dit bericht niet door.</p>
+            <p style="font-size: 12px; color: #94a3b8;">Werkt de knop niet? Kopieer deze link naar je browser:<br><span style="word-break: break-all;">${setPasswordUrl}</span></p>
+            <p style="font-size: 12px; color: #94a3b8;">Heb je deze uitnodiging niet verwacht? Negeer dit bericht. Stuur het niet door.</p>
           </div>
         </div>
       `,

@@ -23,6 +23,12 @@ export default async function TenantLayout({ children }: { children: React.React
 
   return (
     <KeyboardProvider>
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:z-[300] focus:top-2 focus:left-2 focus:bg-white focus:text-slate-900 focus:px-4 focus:py-2 focus:rounded-lg focus:shadow-lg focus:ring-2 focus:ring-primary-500"
+      >
+        Naar hoofdinhoud
+      </a>
       <SearchModal />
       <div className="flex min-h-screen">
         <TenantSidebar
@@ -31,7 +37,7 @@ export default async function TenantLayout({ children }: { children: React.React
           tenantName={settings?.orgName || tenant?.name}
           logoBase64={settings?.logoBase64 ?? null}
         />
-        <main className="md:ml-60 flex-1 min-h-screen bg-slate-50 pt-14 md:pt-0">
+        <main id="main-content" className="md:ml-60 flex-1 min-h-screen bg-slate-50 pt-14 md:pt-0">
           {children}
         </main>
       </div>
