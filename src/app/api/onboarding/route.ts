@@ -113,9 +113,15 @@ export async function POST(req: NextRequest) {
         const templateVersion = await prisma.templateVersion.findFirst({
           where: { templateId, isActive: true },
           orderBy: { createdAt: "desc" },
-          include: { steps: { orderBy: { order: "asc" } }, template: true },
+          include: {
+            steps: { orderBy: { order: "asc" } },
+            template: { include: { moduleLinks: { select: { moduleKey: true } } } },
+          },
         });
         if (!templateVersion) continue;
+
+        // Koppel de aangemaakte flow aan het subonderdeel van de template.
+        const flowModuleKey = templateVersion.template.moduleLinks[0]?.moduleKey ?? null;
 
         for (const phase of phases) {
           const flow = await prisma.flow.create({
@@ -123,6 +129,7 @@ export async function POST(req: NextRequest) {
               tenantId,
               phaseId: phase.id,
               name: templateVersion.template.name,
+              moduleKey: flowModuleKey,
               sourceTemplateVersionId: templateVersion.id,
               status: "ACTIVE",
             },

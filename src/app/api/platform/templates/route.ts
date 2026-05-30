@@ -7,6 +7,7 @@ const createSchema = z.object({
   name: z.string().min(2),
   category: z.string().optional(),
   description: z.string().optional(),
+  isActive: z.boolean().optional(),
 });
 
 export async function GET(req: NextRequest) {

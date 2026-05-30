@@ -5,12 +5,12 @@
 // Draaien:  npx tsx scripts/gen-workflow-diagrams.ts
 
 import { writeFileSync } from "node:fs";
-import { HRM_TEMPLATES } from "../prisma/templates/hrm";
-import { FIN_TEMPLATES } from "../prisma/templates/fin";
-import { CRM_TEMPLATES } from "../prisma/templates/crm";
-import { PRJ_TEMPLATES } from "../prisma/templates/prj";
-import { LOG_TEMPLATES } from "../prisma/templates/log";
-import type { WorkflowTemplate } from "../prisma/templates/types";
+import { HRM_TEMPLATES } from "../src/lib/templates/hrm";
+import { FIN_TEMPLATES } from "../src/lib/templates/fin";
+import { CRM_TEMPLATES } from "../src/lib/templates/crm";
+import { PRJ_TEMPLATES } from "../src/lib/templates/prj";
+import { LOG_TEMPLATES } from "../src/lib/templates/log";
+import type { WorkflowTemplate } from "../src/lib/templates/types";
 import { getSubmoduleLabel } from "../src/lib/modules";
 
 const GROUPS: { label: string; emoji: string; templates: WorkflowTemplate[] }[] = [
