@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
 import { HelpButton } from "@/components/HelpButton";
 
 const ROLE_LABELS: Record<string, string> = {
@@ -12,6 +13,11 @@ const ROLE_LABELS: Record<string, string> = {
 const ALL_ROLES = Object.keys(ROLE_LABELS);
 
 export default function UsersPage() {
+  const { data: session } = useSession();
+  const currentUserId = (session?.user as any)?.id as string | undefined;
+  const currentRoles: string[] = (session?.user as any)?.roles ?? [];
+  const isAdmin = currentRoles.includes("TENANT_ADMIN");
+
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNew, setShowNew] = useState(false);
@@ -20,7 +26,7 @@ export default function UsersPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [emailDomain, setEmailDomain] = useState<string | null>(null);
-  const [editUser, setEditUser] = useState<{ id: string; name: string; roles: string[] } | null>(null);
+  const [editUser, setEditUser] = useState<{ id: string; name: string; email: string; roles: string[] } | null>(null);
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState("");
 
@@ -81,10 +87,15 @@ export default function UsersPage() {
     if (!editUser) return;
     setEditSaving(true);
     setEditError("");
+
+    const isSelf = editUser.id === currentUserId;
+    const payload: Record<string, unknown> = { name: editUser.name, email: editUser.email };
+    if (isAdmin) payload.roles = editUser.roles;
+
     const res = await fetch(`/api/users/${editUser.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: editUser.name, roles: editUser.roles }),
+      body: JSON.stringify(payload),
     });
     if (res.ok) {
       setEditUser(null);
@@ -112,10 +123,12 @@ export default function UsersPage() {
           <h1 className="text-2xl font-bold text-slate-900">Gebruikers</h1>
           <p className="text-slate-500 text-sm mt-1">{users.length} gebruiker{users.length !== 1 ? "s" : ""}</p>
         </div>
-        <button onClick={() => setShowNew(true)} className="btn-primary flex items-center gap-2 self-start sm:self-auto">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-          Gebruiker toevoegen
-        </button>
+        {isAdmin && (
+          <button onClick={() => setShowNew(true)} className="btn-primary flex items-center gap-2 self-start sm:self-auto">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+            Gebruiker toevoegen
+          </button>
+        )}
       </div>
 
       {showNew && (
@@ -217,18 +230,22 @@ export default function UsersPage() {
                     <span key={r} className="text-xs bg-primary-50 text-primary-700 px-2 py-0.5 rounded">{ROLE_LABELS[r] || r}</span>
                   ))}
                 </div>
-                <button
-                  onClick={() => setEditUser({ id: user.id, name: user.name, roles: user.roles })}
-                  className="text-xs px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
-                >
-                  Bewerken
-                </button>
-                <button
-                  onClick={() => toggleActive(user.id, user.isActive)}
-                  className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${user.isActive ? "border-slate-200 text-slate-600 hover:bg-red-50 hover:text-red-700 hover:border-red-200" : "border-green-200 text-green-700 hover:bg-green-50"}`}
-                >
-                  {user.isActive ? "Deactiveren" : "Activeren"}
-                </button>
+                {(isAdmin || user.id === currentUserId) && (
+                  <button
+                    onClick={() => setEditUser({ id: user.id, name: user.name, email: user.email, roles: user.roles })}
+                    className="text-xs px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
+                  >
+                    Bewerken
+                  </button>
+                )}
+                {isAdmin && (
+                  <button
+                    onClick={() => toggleActive(user.id, user.isActive)}
+                    className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${user.isActive ? "border-slate-200 text-slate-600 hover:bg-red-50 hover:text-red-700 hover:border-red-200" : "border-green-200 text-green-700 hover:bg-green-50"}`}
+                  >
+                    {user.isActive ? "Deactiveren" : "Activeren"}
+                  </button>
+                )}
               </div>
             </div>
           ))}
@@ -252,29 +269,46 @@ export default function UsersPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-2">Rollen *</label>
-                <div className="space-y-2">
-                  {ALL_ROLES.map((role) => (
-                    <label key={role} className="flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={editUser.roles.includes(role)}
-                        onChange={() => setEditUser({
-                          ...editUser,
-                          roles: editUser.roles.includes(role)
-                            ? editUser.roles.filter(r => r !== role)
-                            : [...editUser.roles, role],
-                        })}
-                        className="rounded"
-                      />
-                      {ROLE_LABELS[role]}
-                    </label>
-                  ))}
-                </div>
+                <label className="block text-sm font-medium mb-1">E-mailadres *</label>
+                <input
+                  type="email"
+                  className="input"
+                  value={editUser.email}
+                  onChange={e => setEditUser({ ...editUser, email: e.target.value })}
+                  required
+                />
+                {editUser.id !== currentUserId && (
+                  <p className="text-xs text-slate-400 mt-1">
+                    Als dit e-mailadres bij meerdere omgevingen is geregistreerd, kan alleen de gebruiker het zelf wijzigen.
+                  </p>
+                )}
               </div>
+              {isAdmin && (
+                <div>
+                  <label className="block text-sm font-medium mb-2">Rollen *</label>
+                  <div className="space-y-2">
+                    {ALL_ROLES.map((role) => (
+                      <label key={role} className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={editUser.roles.includes(role)}
+                          onChange={() => setEditUser({
+                            ...editUser,
+                            roles: editUser.roles.includes(role)
+                              ? editUser.roles.filter(r => r !== role)
+                              : [...editUser.roles, role],
+                          })}
+                          className="rounded"
+                        />
+                        {ROLE_LABELS[role]}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
               {editError && <div className="text-red-600 text-sm bg-red-50 px-3 py-2 rounded">{editError}</div>}
               <div className="flex gap-3 pt-2">
-                <button type="submit" disabled={editSaving || editUser.roles.length === 0} className="btn-primary flex-1">
+                <button type="submit" disabled={editSaving || (isAdmin && editUser.roles.length === 0)} className="btn-primary flex-1">
                   {editSaving ? "Opslaan..." : "Opslaan"}
                 </button>
                 <button type="button" onClick={() => setEditUser(null)} className="btn-secondary flex-1">Annuleren</button>
