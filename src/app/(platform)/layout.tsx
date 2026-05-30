@@ -15,7 +15,7 @@ export default async function PlatformLayout({ children }: { children: React.Rea
         Naar hoofdinhoud
       </a>
       <PlatformSidebar userName={session.user.name || ""} />
-      <main id="main-content" className="md:ml-60 flex-1 min-h-screen bg-slate-50">
+      <main id="main-content" className="md:ml-60 flex-1 min-h-screen bg-slate-50 pt-14 md:pt-0">
         {children}
       </main>
     </div>
