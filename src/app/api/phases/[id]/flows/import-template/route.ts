@@ -6,6 +6,7 @@ import { z } from "zod";
 const schema = z.object({
   templateVersionId: z.string(),
   name: z.string().min(2),
+  moduleKey: z.string().nullable().optional(),
 });
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -23,15 +24,25 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const templateVersion = await prisma.templateVersion.findUnique({
     where: { id: parsed.data.templateVersionId },
-    include: { steps: { orderBy: { order: "asc" } } },
+    include: {
+      steps: { orderBy: { order: "asc" } },
+      template: { include: { moduleLinks: { select: { moduleKey: true } } } },
+    },
   });
   if (!templateVersion) return NextResponse.json({ error: "Template not found" }, { status: 404 });
+
+  // Subonderdeel: expliciet meegegeven, anders overnemen van de template-koppeling.
+  const moduleKey =
+    parsed.data.moduleKey !== undefined
+      ? parsed.data.moduleKey
+      : templateVersion.template.moduleLinks[0]?.moduleKey ?? null;
 
   const flow = await prisma.flow.create({
     data: {
       name: parsed.data.name,
       phaseId: id,
       tenantId,
+      moduleKey,
       sourceTemplateVersionId: templateVersion.id,
       versions: {
         create: {

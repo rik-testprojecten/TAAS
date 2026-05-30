@@ -56,3 +56,12 @@ try {
 }
 
 run('npx prisma migrate deploy');
+
+// Standaard AFAS-templates per subonderdeel aanmaken/bijwerken. Idempotent
+// (upserts op stabiele id's). Faalt dit, dan mag de deploy niet stuklopen —
+// de templates kunnen later met `npm run db:seed-templates` worden gezet.
+try {
+  run('npx tsx prisma/seed-templates.ts');
+} catch (err) {
+  console.warn('[deploy] Template-seed overgeslagen (niet-fataal):', err?.message ?? err);
+}

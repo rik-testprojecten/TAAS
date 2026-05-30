@@ -19,7 +19,9 @@ export default function TemplatesPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [showNew, setShowNew] = useState(false);
+  const [editTemplateId, setEditTemplateId] = useState<string | null>(null);
   const [showVersionFor, setShowVersionFor] = useState<string | null>(null);
+  const [editVersionId, setEditVersionId] = useState<string | null>(null);
   const [showModulesFor, setShowModulesFor] = useState<string | null>(null);
   const [moduleForm, setModuleForm] = useState<string[]>([]);
   const [form, setForm] = useState({ name: "", category: "ALG", description: "" });
@@ -48,25 +50,62 @@ export default function TemplatesPage() {
   async function createTemplate(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
-    const res = await fetch("/api/platform/templates", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: form.name, category: form.category, description: form.description }),
-    });
-    if (res.ok) { setShowNew(false); setForm({ name: "", category: "ALG", description: "" }); load(1); setPage(1); }
+    const res = editTemplateId
+      ? await fetch(`/api/platform/templates/${editTemplateId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(form),
+        })
+      : await fetch("/api/platform/templates", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(form),
+        });
+    if (res.ok) { setShowNew(false); setEditTemplateId(null); setForm({ name: "", category: "ALG", description: "" }); load(); }
     setSaving(false);
+  }
+
+  function openEditTemplate(t: any) {
+    setEditTemplateId(t.id);
+    setForm({ name: t.name, category: t.category, description: t.description ?? "" });
+    setShowNew(true);
   }
 
   async function createVersion(templateId: string, e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
-    const res = await fetch(`/api/platform/templates/${templateId}/versions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...versionForm, steps: versionForm.steps.filter(s => s.title && s.instruction) }),
-    });
-    if (res.ok) { setShowVersionFor(null); load(); }
+    const cleanSteps = versionForm.steps.filter(s => s.title && s.instruction).map((s, i) => ({ ...s, order: i + 1 }));
+    const res = editVersionId
+      ? await fetch(`/api/platform/templates/${templateId}/versions/${editVersionId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ version: versionForm.version, changelog: versionForm.changelog, steps: cleanSteps }),
+        })
+      : await fetch(`/api/platform/templates/${templateId}/versions`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...versionForm, steps: cleanSteps }),
+        });
+    if (res.ok) { setShowVersionFor(null); setEditVersionId(null); load(); }
     setSaving(false);
+  }
+
+  // Onderhoud: laad de nieuwste versie inclusief stappen om te bewerken.
+  async function openEditVersion(t: any) {
+    const versionId = t.versions?.[0]?.id;
+    if (!versionId) return;
+    const res = await fetch(`/api/platform/templates/${t.id}/versions/${versionId}`);
+    if (!res.ok) return;
+    const v = await res.json();
+    setEditVersionId(versionId);
+    setVersionForm({
+      version: v.version,
+      changelog: v.changelog ?? "",
+      steps: (v.steps ?? []).length > 0
+        ? v.steps.map((s: any) => ({ order: s.order, title: s.title, instruction: s.instruction, expectedResult: s.expectedResult ?? "" }))
+        : [{ order: 1, title: "", instruction: "", expectedResult: "" }],
+    });
+    setShowVersionFor(t.id);
   }
 
   function addStep() {
@@ -124,7 +163,7 @@ export default function TemplatesPage() {
             {loading ? "Laden..." : `${total} template${total !== 1 ? "s" : ""} totaal`}
           </p>
         </div>
-        <button onClick={() => setShowNew(true)} className="btn-primary flex items-center gap-2">
+        <button onClick={() => { setEditTemplateId(null); setForm({ name: "", category: "ALG", description: "" }); setShowNew(true); }} className="btn-primary flex items-center gap-2">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
           Nieuw template
         </button>
@@ -133,7 +172,7 @@ export default function TemplatesPage() {
       {showNew && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl p-6 w-full max-w-md">
-            <h2 className="font-semibold text-lg mb-4">Nieuw template</h2>
+            <h2 className="font-semibold text-lg mb-4">{editTemplateId ? "Template bewerken" : "Nieuw template"}</h2>
             <form onSubmit={createTemplate} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-1">Naam *</label>
@@ -156,8 +195,8 @@ export default function TemplatesPage() {
                 <textarea className="input resize-none" rows={2} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
               </div>
               <div className="flex gap-3 pt-2">
-                <button type="submit" disabled={saving} className="btn-primary flex-1">{saving ? "Aanmaken..." : "Aanmaken"}</button>
-                <button type="button" onClick={() => setShowNew(false)} className="btn-secondary flex-1">Annuleren</button>
+                <button type="submit" disabled={saving} className="btn-primary flex-1">{saving ? "Opslaan..." : (editTemplateId ? "Opslaan" : "Aanmaken")}</button>
+                <button type="button" onClick={() => { setShowNew(false); setEditTemplateId(null); }} className="btn-secondary flex-1">Annuleren</button>
               </div>
             </form>
           </div>
@@ -167,7 +206,7 @@ export default function TemplatesPage() {
       {showVersionFor && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
           <div className="bg-white rounded-xl p-6 w-full max-w-2xl my-4">
-            <h2 className="font-semibold text-lg mb-4">Versie toevoegen</h2>
+            <h2 className="font-semibold text-lg mb-4">{editVersionId ? "Versie bewerken" : "Versie toevoegen"}</h2>
             <form onSubmit={(e) => createVersion(showVersionFor, e)} className="space-y-4">
               <div className="flex gap-3">
                 <div className="flex-1">
@@ -198,8 +237,8 @@ export default function TemplatesPage() {
                 </div>
               </div>
               <div className="flex gap-3 pt-2">
-                <button type="submit" disabled={saving} className="btn-primary flex-1">{saving ? "Opslaan..." : "Versie opslaan"}</button>
-                <button type="button" onClick={() => setShowVersionFor(null)} className="btn-secondary flex-1">Annuleren</button>
+                <button type="submit" disabled={saving} className="btn-primary flex-1">{saving ? "Opslaan..." : (editVersionId ? "Wijzigingen opslaan" : "Versie opslaan")}</button>
+                <button type="button" onClick={() => { setShowVersionFor(null); setEditVersionId(null); }} className="btn-secondary flex-1">Annuleren</button>
               </div>
             </form>
           </div>
@@ -303,10 +342,18 @@ export default function TemplatesPage() {
                   </div>
                 </div>
                 <div className="flex flex-col gap-2 ml-4 shrink-0">
+                  <button onClick={() => openEditTemplate(t)} className="btn-secondary text-sm whitespace-nowrap">
+                    Bewerken
+                  </button>
                   <button onClick={() => openModules(t)} className="btn-secondary text-sm whitespace-nowrap">
                     Onderdelen koppelen
                   </button>
-                  <button onClick={() => { setShowVersionFor(t.id); setVersionForm({ version: `v${((t.versions?.length ?? 0) + 1)}.0`, changelog: "", steps: [{ order: 1, title: "", instruction: "", expectedResult: "" }] }); }} className="btn-secondary text-sm whitespace-nowrap">
+                  {latestVersion && (
+                    <button onClick={() => openEditVersion(t)} className="btn-secondary text-sm whitespace-nowrap">
+                      Stappen bewerken
+                    </button>
+                  )}
+                  <button onClick={() => { setEditVersionId(null); setShowVersionFor(t.id); setVersionForm({ version: `v${((t.versions?.length ?? 0) + 1)}.0`, changelog: "", steps: [{ order: 1, title: "", instruction: "", expectedResult: "" }] }); }} className="btn-secondary text-sm whitespace-nowrap">
                     + Versie toevoegen
                   </button>
                 </div>

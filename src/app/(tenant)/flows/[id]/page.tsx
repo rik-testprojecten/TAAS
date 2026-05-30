@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useToast } from "@/components/Toast";
 import { AttachmentUploader, AttachmentList, type AttachmentMeta } from "@/components/AttachmentUploader";
+import { MODULES, getSubmoduleLabel } from "@/lib/modules";
 
 type InsertPosition = { type: "before" | "after" | "end"; stepId?: string };
 type StepForm = { title: string; instruction: string; expectedResult: string; assigneeIds: string[]; attachments: AttachmentMeta[] };
@@ -163,7 +164,7 @@ export default function FlowBuilderPage() {
   const [saving, setSaving] = useState(false);
   const [tenantUsers, setTenantUsers] = useState<any[]>([]);
   const [editingMeta, setEditingMeta] = useState(false);
-  const [metaForm, setMetaForm] = useState({ name: "", description: "" });
+  const [metaForm, setMetaForm] = useState({ name: "", description: "", moduleKey: "" });
   const [savingMeta, setSavingMeta] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -310,7 +311,7 @@ export default function FlowBuilderPage() {
     const res = await fetch(`/api/flows/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: metaForm.name, description: metaForm.description }),
+      body: JSON.stringify({ name: metaForm.name, description: metaForm.description, moduleKey: metaForm.moduleKey || null }),
     });
     setEditingMeta(false);
     await load();
@@ -436,6 +437,16 @@ export default function FlowBuilderPage() {
                 onChange={(e) => setMetaForm({ ...metaForm, description: e.target.value })}
                 placeholder="Beschrijving (optioneel)"
               />
+              <select className="input text-sm" value={metaForm.moduleKey} onChange={(e) => setMetaForm({ ...metaForm, moduleKey: e.target.value })}>
+                <option value="">— Geen subonderdeel —</option>
+                {MODULES.map((mod) => (
+                  <optgroup key={mod.key} label={`${mod.emoji} ${mod.label}`}>
+                    {mod.submodules.map((s) => (
+                      <option key={s.key} value={s.key}>{s.label}</option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
               <div className="flex gap-2">
                 <button onClick={saveMeta} disabled={savingMeta || !metaForm.name} className="btn-primary text-sm">
                   {savingMeta ? (
@@ -456,9 +467,10 @@ export default function FlowBuilderPage() {
                   <span className="text-sm text-slate-400 bg-slate-100 px-2 py-1 rounded">{activeVersion.version}</span>
                 )}
                 {isClosed && <span className="text-sm bg-slate-200 text-slate-600 px-2 py-1 rounded">Afgesloten</span>}
+                {flow.moduleKey && <span className="text-sm text-forest-700 bg-forest-50 border border-forest-100 px-2 py-1 rounded">{getSubmoduleLabel(flow.moduleKey)}</span>}
                 {!isClosed && (
                   <button
-                    onClick={() => { setMetaForm({ name: flow.name, description: flow.description ?? "" }); setEditingMeta(true); }}
+                    onClick={() => { setMetaForm({ name: flow.name, description: flow.description ?? "", moduleKey: flow.moduleKey ?? "" }); setEditingMeta(true); }}
                     title="Naam en beschrijving bewerken"
                     className="p-1 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded"
                   >

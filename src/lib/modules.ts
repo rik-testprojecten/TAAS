@@ -87,3 +87,29 @@ export function getSubmoduleLabel(key: string): string {
   }
   return key;
 }
+
+export type SubmoduleInfo = {
+  key: string;
+  label: string;
+  moduleKey: string;
+  moduleLabel: string;
+  emoji: string;
+};
+
+// Platte lijst van alle subonderdelen met hun bovenliggende module.
+export function getAllSubmodules(): SubmoduleInfo[] {
+  return MODULES.flatMap((mod) =>
+    mod.submodules.map((sub) => ({
+      key: sub.key,
+      label: sub.label,
+      moduleKey: mod.key,
+      moduleLabel: mod.label,
+      emoji: mod.emoji,
+    })),
+  );
+}
+
+export function getModuleKeyForSubmodule(submoduleKey: string): string | null {
+  const mod = MODULES.find((m) => m.submodules.some((s) => s.key === submoduleKey));
+  return mod ? mod.key : null;
+}

@@ -29,16 +29,13 @@ const REQUIRED: Array<{ table: string; column: string }> = [
   { table: "TenantUser", column: "isBlocked" },
   { table: "TenantUser", column: "mfaEnabled" },
   { table: "TenantUser", column: "mfaSecret" },
-  // Template-categorieën (hoofd-/subcategorie). De enum-kolom Template.category
-  // is vervangen door FK-kolommen naar twee nieuwe tabellen; op een via
-  // `db push` aangemaakte database ontbreken deze nog.
-  { table: "Template", column: "mainCategoryId" },
-  { table: "Template", column: "subCategoryId" },
+  { table: "Flow", column: "moduleKey" },
+  { table: "Issue", column: "moduleKey" },
 ];
 
 // Tabellen die volledig nieuw zijn (niet slechts een ontbrekende kolom). Worden
 // idempotent aangemaakt voordat de bijbehorende FK-kolommen worden gekoppeld.
-const REQUIRED_TABLES = ["TemplateMainCategory", "TemplateSubCategory"];
+const REQUIRED_TABLES: string[] = [];
 
 // Once the schema is confirmed in sync we never touch the database again.
 let confirmed = false;
@@ -150,6 +147,8 @@ async function reconcile(): Promise<void> {
   await prisma.$executeRawUnsafe(`ALTER TABLE "TenantUser" ADD COLUMN IF NOT EXISTS "isBlocked" BOOLEAN NOT NULL DEFAULT false`);
   await prisma.$executeRawUnsafe(`ALTER TABLE "TenantUser" ADD COLUMN IF NOT EXISTS "mfaEnabled" BOOLEAN NOT NULL DEFAULT false`);
   await prisma.$executeRawUnsafe(`ALTER TABLE "TenantUser" ADD COLUMN IF NOT EXISTS "mfaSecret" TEXT`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "Flow" ADD COLUMN IF NOT EXISTS "moduleKey" TEXT`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "Issue" ADD COLUMN IF NOT EXISTS "moduleKey" TEXT`);
   await prisma.$executeRawUnsafe(
     `DO $$ BEGIN
        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'RunStep_parentRunStepId_fkey') THEN

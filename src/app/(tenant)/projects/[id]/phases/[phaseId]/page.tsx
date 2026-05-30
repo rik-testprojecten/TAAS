@@ -5,6 +5,28 @@ import Link from "next/link";
 import { STATUS_COLORS, PHASE_DESCRIPTIONS, PHASE_STATUS_LABELS, RUN_STATUS_LABELS, formatDate, todayISO, daysFromNowISO } from "@/lib/utils";
 import { Tabs } from "@/components/Tabs";
 import { useToast } from "@/components/Toast";
+import { MODULES, getSubmoduleLabel } from "@/lib/modules";
+
+// Keuzelijst voor het subonderdeel waaraan een flow gekoppeld wordt.
+function SubmoduleSelect({ value, onChange, allowed }: { value: string; onChange: (v: string) => void; allowed?: string[] }) {
+  const allowSet = allowed && allowed.length > 0 ? new Set(allowed) : null;
+  return (
+    <select className="input" value={value} onChange={(e) => onChange(e.target.value)}>
+      <option value="">— Geen subonderdeel —</option>
+      {MODULES.map((mod) => {
+        const subs = mod.submodules.filter((s) => !allowSet || allowSet.has(s.key));
+        if (subs.length === 0) return null;
+        return (
+          <optgroup key={mod.key} label={`${mod.emoji} ${mod.label}`}>
+            {subs.map((s) => (
+              <option key={s.key} value={s.key}>{s.label}</option>
+            ))}
+          </optgroup>
+        );
+      })}
+    </select>
+  );
+}
 
 export default function PhasePage() {
   const toast = useToast();
@@ -21,9 +43,10 @@ export default function PhasePage() {
   const [showCopy, setShowCopy] = useState<{ flow: any } | null>(null);
   const [showFlowDates, setShowFlowDates] = useState<{ flow: any } | null>(null);
   const [showPhaseDates, setShowPhaseDates] = useState(false);
-  const [form, setForm] = useState({ name: "", description: "" });
-  const [importForm, setImportForm] = useState({ name: "", templateVersionId: "" });
-  const [copyForm, setCopyForm] = useState({ name: "", targetPhaseId: "" });
+  const [form, setForm] = useState({ name: "", description: "", moduleKey: "" });
+  const [importForm, setImportForm] = useState({ name: "", templateVersionId: "", moduleKey: "" });
+  const [copyForm, setCopyForm] = useState({ name: "", targetPhaseId: "", moduleKey: "" });
+  const [allowedSubmodules, setAllowedSubmodules] = useState<string[]>([]);
   const [flowDatesForm, setFlowDatesForm] = useState({ scheduledStart: "", scheduledEnd: "" });
   const [phaseDatesForm, setPhaseDatesForm] = useState({ startDate: "", endDate: "" });
   const [saving, setSaving] = useState(false);
@@ -70,6 +93,10 @@ export default function PhasePage() {
       .then(r => r.json())
       .then(d => setTenantUsers(Array.isArray(d) ? d : []))
       .catch(() => toast.error("Gebruikers konden niet worden geladen"));
+    fetch("/api/settings")
+      .then(r => r.json())
+      .then(d => setAllowedSubmodules(Array.isArray(d?.selectedSubmodules) ? d.selectedSubmodules : []))
+      .catch(() => {});
   }, [phaseId, load]);
 
   async function loadMonitor() {
@@ -90,9 +117,9 @@ export default function PhasePage() {
     const res = await fetch(`/api/phases/${phaseId}/flows`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
+      body: JSON.stringify({ ...form, moduleKey: form.moduleKey || null }),
     });
-    if (res.ok) { setShowNewFlow(false); setForm({ name: "", description: "" }); load(); }
+    if (res.ok) { setShowNewFlow(false); setForm({ name: "", description: "", moduleKey: "" }); load(); }
     setSaving(false);
   }
 
@@ -102,9 +129,9 @@ export default function PhasePage() {
     const res = await fetch(`/api/phases/${phaseId}/flows/import-template`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(importForm),
+      body: JSON.stringify({ ...importForm, moduleKey: importForm.moduleKey || null }),
     });
-    if (res.ok) { setShowImport(false); setImportForm({ name: "", templateVersionId: "" }); load(); }
+    if (res.ok) { setShowImport(false); setImportForm({ name: "", templateVersionId: "", moduleKey: "" }); load(); }
     setSaving(false);
   }
 
@@ -118,10 +145,10 @@ export default function PhasePage() {
     await fetch(`/api/phases/${targetPhase}/flows/clone-from-phase`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sourceFlowVersionId: latestVersion.id, name: copyForm.name, includeIssues: false }),
+      body: JSON.stringify({ sourceFlowVersionId: latestVersion.id, name: copyForm.name, includeIssues: false, moduleKey: copyForm.moduleKey || null }),
     });
     setShowCopy(null);
-    setCopyForm({ name: "", targetPhaseId: "" });
+    setCopyForm({ name: "", targetPhaseId: "", moduleKey: "" });
     load();
     setSaving(false);
   }
@@ -265,7 +292,7 @@ export default function PhasePage() {
   if (!phase || phase.error) return <div className="p-8 text-slate-500">Fase niet gevonden</div>;
 
   const allTemplateVersions = templates.flatMap((t: any) =>
-    (t.versions || []).map((v: any) => ({ ...v, templateName: t.name, category: t.category }))
+    (t.versions || []).map((v: any) => ({ ...v, templateName: t.name, category: t.category, moduleKeys: (t.moduleLinks || []).map((l: any) => l.moduleKey) }))
   );
 
   const isGAT = phase.name === "GAT";
@@ -525,6 +552,9 @@ export default function PhasePage() {
                         {flow.sourceFlowVersionId && (
                           <span className="text-xs text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">Overgenomen</span>
                         )}
+                        {flow.moduleKey && (
+                          <span className="text-xs text-forest-700 bg-forest-50 border border-forest-100 px-2 py-0.5 rounded">{getSubmoduleLabel(flow.moduleKey)}</span>
+                        )}
                       </div>
                       {flow.description && <p className="text-sm text-slate-500 mb-2">{flow.description}</p>}
                       <div className="flex items-center gap-3 text-xs text-slate-400 flex-wrap">
@@ -558,7 +588,7 @@ export default function PhasePage() {
                         </svg>
                       </button>
                       <button
-                        onClick={() => { setShowCopy({ flow }); setCopyForm({ name: `${flow.name} (kopie)`, targetPhaseId: "" }); }}
+                        onClick={() => { setShowCopy({ flow }); setCopyForm({ name: `${flow.name} (kopie)`, targetPhaseId: "", moduleKey: flow.moduleKey || "" }); }}
                         title="Flow kopiëren"
                         className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded"
                       >
@@ -876,6 +906,11 @@ export default function PhasePage() {
                 <label className="block text-sm font-medium mb-1">Beschrijving</label>
                 <textarea className="input resize-none" rows={2} value={form.description} onChange={e => setForm({...form, description: e.target.value})} />
               </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Subonderdeel</label>
+                <SubmoduleSelect value={form.moduleKey} onChange={(v) => setForm({ ...form, moduleKey: v })} allowed={allowedSubmodules} />
+                <p className="text-xs text-slate-400 mt-1">Koppel de flow aan een subonderdeel voor het overzicht per onderdeel.</p>
+              </div>
               <div className="flex gap-3 pt-2">
                 <button type="submit" disabled={saving} className="btn-primary flex-1">{saving ? "Aanmaken..." : "Aanmaken"}</button>
                 <button type="button" onClick={() => setShowNewFlow(false)} className="btn-secondary flex-1">Annuleren</button>
@@ -948,12 +983,20 @@ export default function PhasePage() {
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Template versie *</label>
-                <select className="input" value={importForm.templateVersionId} onChange={e => setImportForm({...importForm, templateVersionId: e.target.value})} required>
+                <select className="input" value={importForm.templateVersionId} onChange={e => {
+                  const v = allTemplateVersions.find((x: any) => x.id === e.target.value);
+                  setImportForm({ ...importForm, templateVersionId: e.target.value, moduleKey: importForm.moduleKey || v?.moduleKeys?.[0] || "" });
+                }} required>
                   <option value="">Selecteer template...</option>
                   {allTemplateVersions.map((v: any) => (
                     <option key={v.id} value={v.id}>{v.templateName} — {v.version} ({v.category})</option>
                   ))}
                 </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Subonderdeel</label>
+                <SubmoduleSelect value={importForm.moduleKey} onChange={(v) => setImportForm({ ...importForm, moduleKey: v })} allowed={allowedSubmodules} />
+                <p className="text-xs text-slate-400 mt-1">Standaard overgenomen van de template; je kunt dit aanpassen.</p>
               </div>
               <div className="flex gap-3 pt-2">
                 <button type="submit" disabled={saving} className="btn-primary flex-1">{saving ? "Importeren..." : "Importeren"}</button>
@@ -986,6 +1029,10 @@ export default function PhasePage() {
                   </select>
                 </div>
               )}
+              <div>
+                <label className="block text-sm font-medium mb-1">Subonderdeel</label>
+                <SubmoduleSelect value={copyForm.moduleKey} onChange={(v) => setCopyForm({ ...copyForm, moduleKey: v })} allowed={allowedSubmodules} />
+              </div>
               <div className="flex gap-3 pt-2">
                 <button type="submit" disabled={saving} className="btn-primary flex-1">{saving ? "Kopiëren..." : "Kopiëren"}</button>
                 <button type="button" onClick={() => setShowCopy(null)} className="btn-secondary flex-1">Annuleren</button>
