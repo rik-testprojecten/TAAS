@@ -474,12 +474,12 @@ function PlatformSidebarContent({ userName, onNavigate }: { userName: string; on
           </div>
         </div>
       </div>
-      <nav className="flex-1 px-3 py-4 space-y-1" aria-label="Platform navigatie">
+      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1" aria-label="Platform navigatie">
         {platformItems.map((item) => <NavLink key={item.href} item={item} onNavigate={onNavigate} />)}
       </nav>
       <div className="px-3 py-4 border-t border-forest-900">
         <div className="flex items-center gap-3 px-3 py-2 mb-2">
-          <div className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center text-white text-sm font-medium">
+          <div className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center text-white text-sm font-medium shrink-0">
             {userName.charAt(0).toUpperCase()}
           </div>
           <div className="text-white text-sm font-medium truncate">{userName}</div>
@@ -502,10 +502,12 @@ export function PlatformSidebar({ userName }: { userName: string }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
 
+  // Close drawer on route change
   useEffect(() => {
     setMobileOpen(false);
   }, [pathname]);
 
+  // Close on Escape
   useEffect(() => {
     if (!mobileOpen) return;
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") setMobileOpen(false); };
@@ -526,7 +528,7 @@ export function PlatformSidebar({ userName }: { userName: string }) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
-        <span className="text-white font-semibold text-sm">TAAS Platform</span>
+        <span className="text-white font-semibold text-sm truncate">TAAS Platform</span>
       </div>
 
       {/* Mobile overlay */}
@@ -538,7 +540,7 @@ export function PlatformSidebar({ userName }: { userName: string }) {
         />
       )}
 
-      {/* Desktop sidebar */}
+      {/* Desktop sidebar (always visible) */}
       <aside className="fixed left-0 top-0 h-full w-60 bg-forest-800 flex-col z-30 hidden md:flex">
         <PlatformSidebarContent userName={userName} />
       </aside>
@@ -549,7 +551,7 @@ export function PlatformSidebar({ userName }: { userName: string }) {
           "fixed left-0 top-0 h-full w-72 bg-forest-800 flex flex-col z-50 md:hidden transition-transform duration-200",
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         )}
-        aria-label="Platform navigatiemenu"
+        aria-label="Navigatiemenu"
       >
         <div className="flex items-center justify-end px-3 pt-3">
           <button

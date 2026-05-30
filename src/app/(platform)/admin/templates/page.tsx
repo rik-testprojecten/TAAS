@@ -174,15 +174,15 @@ export default function TemplatesPage() {
   if (loading) return <div className="p-8 text-slate-500">Laden...</div>;
 
   return (
-    <div className="p-8">
-      <div className="flex items-center justify-between mb-8">
+    <div className="p-4 sm:p-8">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Templates</h1>
           <p className="text-slate-500 text-sm mt-1">
             {loading ? "Laden..." : `${total} template${total !== 1 ? "s" : ""} totaal`}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button onClick={loadStandardTemplates} disabled={seeding} className="btn-secondary flex items-center gap-2">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
             {seeding ? "Laden..." : "Standaardtemplates laden"}
@@ -344,7 +344,7 @@ export default function TemplatesPage() {
           const latestVersion = t.versions?.[0];
           return (
             <div key={t.id} className="card p-5">
-              <div className="flex items-start justify-between">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <div className="flex items-center gap-3 mb-1 flex-wrap">
                     <h3 className="font-semibold text-slate-900">{t.name}</h3>
@@ -376,7 +376,7 @@ export default function TemplatesPage() {
                     )}
                   </div>
                 </div>
-                <div className="flex flex-col gap-2 ml-4 shrink-0">
+                <div className="flex flex-row flex-wrap gap-2 sm:flex-col sm:ml-4 shrink-0">
                   <button onClick={() => toggleActive(t)} className={`text-sm whitespace-nowrap px-3 py-1.5 rounded-lg border ${t.isActive ? "text-amber-700 border-amber-200 hover:bg-amber-50" : "text-emerald-700 border-emerald-200 hover:bg-emerald-50"}`}>
                     {t.isActive ? "Naar concept" : "Publiceren"}
                   </button>
