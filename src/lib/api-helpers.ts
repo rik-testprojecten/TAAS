@@ -2,6 +2,7 @@ import { auth } from "../../auth";
 import { NextResponse } from "next/server";
 import type { SessionUser } from "@/types";
 import { logger } from "@/lib/logger";
+import { prisma } from "@/lib/prisma";
 
 export type ApiContext = {
   user: SessionUser;
@@ -18,6 +19,17 @@ export async function requireTenantAuth(
   }
   if (session.user.userType !== "tenant" || !session.user.tenantId) {
     logger.warn({ userId: session.user.id, userType: session.user.userType }, "Forbidden — wrong user type");
+    return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
+  }
+  // Controleer dat het account nog actief, niet-geblokkeerd en aan deze klant
+  // gekoppeld is. Hiermee werken blokkeren/verwijderen direct door, ook voor
+  // reeds bestaande sessies, en blijft kruis-klant-toegang uitgesloten.
+  const account = await prisma.tenantUser.findFirst({
+    where: { id: session.user.id, tenantId: session.user.tenantId },
+    select: { isActive: true, isBlocked: true },
+  });
+  if (!account || !account.isActive || account.isBlocked) {
+    logger.warn({ userId: session.user.id, tenantId: session.user.tenantId }, "Forbidden — account inactive, blocked or mismatched");
     return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
   }
   if (allowedRoles && allowedRoles.length > 0) {

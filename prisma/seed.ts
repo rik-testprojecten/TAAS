@@ -71,6 +71,43 @@ async function main() {
     },
   });
 
+  // Tweede demo-klant — met verplichte 2FA, om MFA te demonstreren
+  const tenant2 = await prisma.tenant.upsert({
+    where: { slug: "demo-provincie" },
+    update: {},
+    create: {
+      name: "Demo Provincie",
+      slug: "demo-provincie",
+      mfaRequired: true,
+    },
+  });
+
+  // Gedeeld e-mailadres dat bij BEIDE klanten hoort. De gebruiker kiest na het
+  // inloggen welke klantomgeving hij/zij wil openen.
+  const sharedPassword = await bcrypt.hash("Shared123!", 10);
+  await prisma.tenantUser.upsert({
+    where: { tenantId_email: { tenantId: tenant.id, email: "consultant@rhoost.nl" } },
+    update: {},
+    create: {
+      tenantId: tenant.id,
+      email: "consultant@rhoost.nl",
+      name: "Gedeelde Consultant",
+      roles: [TenantRole.TENANT_ADMIN],
+      password: sharedPassword,
+    },
+  });
+  await prisma.tenantUser.upsert({
+    where: { tenantId_email: { tenantId: tenant2.id, email: "consultant@rhoost.nl" } },
+    update: {},
+    create: {
+      tenantId: tenant2.id,
+      email: "consultant@rhoost.nl",
+      name: "Gedeelde Consultant",
+      roles: [TenantRole.TENANT_ADMIN],
+      password: sharedPassword,
+    },
+  });
+
   // Templates
   const hrTemplate = await prisma.template.upsert({
     where: { id: "tpl-hr-instroom" },
@@ -177,6 +214,8 @@ async function main() {
   console.log("Tenant admin: admin@demo-gemeente.nl / Tenant123!");
   console.log("Tester: tester@demo-gemeente.nl / Tester123!");
   console.log("FB: fb@demo-gemeente.nl / Manager123!");
+  console.log("Gedeelde consultant (2 klanten): consultant@rhoost.nl / Shared123!");
+  console.log("  → Demo Provincie vereist 2FA (koppelstap bij eerste inlog)");
 }
 
 main()
