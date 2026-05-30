@@ -34,7 +34,9 @@ export async function PATCH(
 
     const newEmail = email.toLowerCase().trim();
     if (newEmail !== targetUser.email.toLowerCase()) {
-      const sharedCount = await prisma.tenantUser.count({ where: { email: targetUser.email } });
+      const sharedCount = await prisma.tenantUser.count({
+        where: { email: { equals: targetUser.email, mode: "insensitive" } },
+      });
       if (sharedCount > 1) {
         return NextResponse.json(
           { error: "Dit e-mailadres is bij meerdere omgevingen geregistreerd. Alleen de gebruiker zelf mag dit wijzigen." },

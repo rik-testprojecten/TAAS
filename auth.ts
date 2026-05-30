@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "./src/lib/prisma";
 import { verifyToken } from "./src/lib/totp";
 import { getTenantLoginCandidates } from "./src/lib/login-queries";
+import { normalizeEmail } from "./src/lib/email";
 
 const useSecureCookies = process.env.NODE_ENV === "production";
 
@@ -39,7 +40,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
       authorize: async (credentials) => {
         if (!credentials?.email || !credentials?.password) return null;
-        const email = (credentials.email as string).trim();
+        const email = normalizeEmail(credentials.email as string);
         const password = credentials.password as string;
         const accountId = (credentials.accountId as string | undefined) || undefined;
         const totp = (credentials.totp as string | undefined) || undefined;

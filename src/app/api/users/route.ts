@@ -6,6 +6,7 @@ import bcrypt from "bcryptjs";
 import { sendInviteMail } from "@/lib/mailer";
 import { createInviteToken } from "@/lib/invite-token";
 import { rateLimit } from "@/lib/rate-limit";
+import { normalizeEmail } from "@/lib/email";
 
 const createSchema = z.object({
   name: z.string().min(2),
@@ -40,14 +41,19 @@ export async function POST(req: NextRequest) {
   const parsed = createSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
-  const existing = await prisma.tenantUser.findFirst({ where: { tenantId, email: parsed.data.email } });
+  const email = normalizeEmail(parsed.data.email);
+  const existing = await prisma.tenantUser.findFirst({
+    where: { tenantId, email: { equals: email, mode: "insensitive" } },
+  });
   if (existing) return NextResponse.json({ error: "Email already in use" }, { status: 409 });
 
   const hashed = await bcrypt.hash(parsed.data.password, 10);
   const { sendInvite, ...userData } = parsed.data;
 
   const user = await prisma.tenantUser.create({
-    data: { ...userData, password: hashed, tenantId },
+    // email/password na de spread zodat de genormaliseerde + gehashte waarden
+    // de ruwe invoer uit userData overschrijven.
+    data: { ...userData, email, password: hashed, tenantId },
     select: { id: true, name: true, email: true, roles: true, isActive: true },
   });
 
@@ -58,7 +64,7 @@ export async function POST(req: NextRequest) {
     // Send a secure set-password link instead of the plaintext password.
     const token = createInviteToken(user.id, user.email);
     inviteSent = await sendInviteMail({
-      to: parsed.data.email,
+      to: user.email,
       name: parsed.data.name,
       setPasswordToken: token,
       tenantName: settings?.orgName ?? tenant?.name ?? "TAAS",
