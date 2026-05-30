@@ -46,7 +46,7 @@ export async function getTenantLoginCandidates(
 
   try {
     const rows = await prisma.tenantUser.findMany({
-      where: { email, isActive: true },
+      where: { email: { equals: email, mode: "insensitive" }, isActive: true },
       include: { tenant: { select: { id: true, name: true, isActive: true, mfaRequired: true } } },
     });
     return rows.map((tu) => ({
@@ -84,7 +84,7 @@ export async function getTenantLoginCandidates(
              t."name" AS "tenantName", t."isActive" AS "tenantActive"
       FROM "TenantUser" tu
       JOIN "Tenant" t ON t."id" = tu."tenantId"
-      WHERE tu."email" = ${email} AND tu."isActive" = true
+      WHERE LOWER(tu."email") = LOWER(${email}) AND tu."isActive" = true
     `;
     return rows.map((r) => ({
       ...r,

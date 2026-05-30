@@ -36,24 +36,34 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: "Ongeldige invoer" }, { status: 400 });
   }
-  const { email, password } = parsed.data;
+  const email = parsed.data.email.trim();
+  const { password } = parsed.data;
 
   try {
     const accounts: ResolvedAccount[] = [];
 
-    // Platform-gebruiker (raakt geen reconcilieerbare kolommen).
-    const platformUser = await prisma.platformUser.findUnique({ where: { email } });
+    // Platform-gebruiker (raakt geen reconcilieerbare kolommen). Case-insensitief
+    // zodat invoer van mobiele toetsenborden (hoofdletter/spatie) blijft matchen.
+    const platformUser = await prisma.platformUser.findFirst({
+      where: { email: { equals: email, mode: "insensitive" } },
+    });
+    let platformPwOk = false;
     if (platformUser && platformUser.isActive) {
-      if (await bcrypt.compare(password, platformUser.password)) {
+      platformPwOk = await bcrypt.compare(password, platformUser.password);
+      if (platformPwOk) {
         accounts.push({ type: "platform", id: "platform", label: "Rhoost Platform" });
       }
     }
 
     // Klant-gebruikers — kan meerdere klanten betreffen met hetzelfde e-mailadres.
     const candidates = await getTenantLoginCandidates(email);
+    let tenantPwMatches = 0;
+    let tenantActiveRows = 0;
     for (const c of candidates) {
       if (c.isBlocked || !c.tenantActive) continue;
+      tenantActiveRows++;
       if (await bcrypt.compare(password, c.password)) {
+        tenantPwMatches++;
         accounts.push({
           type: "tenant",
           id: c.id,
@@ -66,6 +76,19 @@ export async function POST(req: NextRequest) {
     }
 
     if (accounts.length === 0) {
+      // Diagnostiek zonder gevoelige data: laat zien waar het op nul valt.
+      logger.warn(
+        {
+          emailLen: email.length,
+          platformFound: !!platformUser,
+          platformActive: platformUser?.isActive ?? false,
+          platformPwOk,
+          tenantRows: candidates.length,
+          tenantActiveRows,
+          tenantPwMatches,
+        },
+        "Login resolve: geen accounts gevonden"
+      );
       return NextResponse.json(
         { error: "Ongeldig e-mailadres of wachtwoord" },
         { status: 401 }

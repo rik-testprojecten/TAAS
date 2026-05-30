@@ -39,7 +39,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
       authorize: async (credentials) => {
         if (!credentials?.email || !credentials?.password) return null;
-        const email = credentials.email as string;
+        const email = (credentials.email as string).trim();
         const password = credentials.password as string;
         const accountId = (credentials.accountId as string | undefined) || undefined;
         const totp = (credentials.totp as string | undefined) || undefined;
@@ -48,8 +48,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // Alleen proberen als er geen specifieke klant is gekozen, of het
         // platform-account expliciet is geselecteerd.
         if (!accountId || accountId === "platform") {
-          const platformUser = await prisma.platformUser.findUnique({
-            where: { email },
+          const platformUser = await prisma.platformUser.findFirst({
+            where: { email: { equals: email, mode: "insensitive" } },
           });
           if (platformUser && platformUser.isActive) {
             const valid = await bcrypt.compare(password, platformUser.password);
