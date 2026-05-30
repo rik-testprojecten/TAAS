@@ -29,7 +29,16 @@ const REQUIRED: Array<{ table: string; column: string }> = [
   { table: "TenantUser", column: "isBlocked" },
   { table: "TenantUser", column: "mfaEnabled" },
   { table: "TenantUser", column: "mfaSecret" },
+  // Template-categorieën (hoofd-/subcategorie). De enum-kolom Template.category
+  // is vervangen door FK-kolommen naar twee nieuwe tabellen; op een via
+  // `db push` aangemaakte database ontbreken deze nog.
+  { table: "Template", column: "mainCategoryId" },
+  { table: "Template", column: "subCategoryId" },
 ];
+
+// Tabellen die volledig nieuw zijn (niet slechts een ontbrekende kolom). Worden
+// idempotent aangemaakt voordat de bijbehorende FK-kolommen worden gekoppeld.
+const REQUIRED_TABLES = ["TemplateMainCategory", "TemplateSubCategory"];
 
 // Once the schema is confirmed in sync we never touch the database again.
 let confirmed = false;
@@ -37,15 +46,102 @@ let confirmed = false;
 let inflight: Promise<void> | null = null;
 
 async function reconcile(): Promise<void> {
-  const present = await prisma.$queryRawUnsafe<Array<{ count: number }>>(
-    `SELECT COUNT(*)::int AS count FROM information_schema.columns
-     WHERE (table_name, column_name) IN (${REQUIRED.map(
-       (r) => `('${r.table}', '${r.column}')`,
-     ).join(", ")})`,
-  );
-  if (Number(present[0]?.count ?? 0) >= REQUIRED.length) return; // already in sync
+  const [cols, tables] = await Promise.all([
+    prisma.$queryRawUnsafe<Array<{ count: number }>>(
+      `SELECT COUNT(*)::int AS count FROM information_schema.columns
+       WHERE (table_name, column_name) IN (${REQUIRED.map(
+         (r) => `('${r.table}', '${r.column}')`,
+       ).join(", ")})`,
+    ),
+    prisma.$queryRawUnsafe<Array<{ count: number }>>(
+      `SELECT COUNT(*)::int AS count FROM information_schema.tables
+       WHERE table_name IN (${REQUIRED_TABLES.map((t) => `'${t}'`).join(", ")})`,
+    ),
+  ]);
+  const columnsOk = Number(cols[0]?.count ?? 0) >= REQUIRED.length;
+  const tablesOk = Number(tables[0]?.count ?? 0) >= REQUIRED_TABLES.length;
+  if (columnsOk && tablesOk) return; // already in sync
 
-  console.warn("[schema-reconcile] Missing columns detected — applying schema fix.");
+  console.warn("[schema-reconcile] Missing columns/tables detected — applying schema fix.");
+
+  // ── Template-categorieën: tabellen, kolommen, FK's en standaardrecords ──
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "TemplateMainCategory" (
+      "id" TEXT NOT NULL,
+      "name" TEXT NOT NULL,
+      "slug" TEXT NOT NULL,
+      "isActive" BOOLEAN NOT NULL DEFAULT true,
+      "order" INTEGER NOT NULL DEFAULT 0,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "TemplateMainCategory_pkey" PRIMARY KEY ("id")
+    )`);
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "TemplateSubCategory" (
+      "id" TEXT NOT NULL,
+      "mainCategoryId" TEXT NOT NULL,
+      "name" TEXT NOT NULL,
+      "slug" TEXT NOT NULL,
+      "isActive" BOOLEAN NOT NULL DEFAULT true,
+      "order" INTEGER NOT NULL DEFAULT 0,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "TemplateSubCategory_pkey" PRIMARY KEY ("id")
+    )`);
+  await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "TemplateMainCategory_slug_key" ON "TemplateMainCategory"("slug")`);
+  await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "TemplateSubCategory_mainCategoryId_slug_key" ON "TemplateSubCategory"("mainCategoryId", "slug")`);
+  await prisma.$executeRawUnsafe(
+    `DO $$ BEGIN
+       IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'TemplateSubCategory_mainCategoryId_fkey') THEN
+         ALTER TABLE "TemplateSubCategory" ADD CONSTRAINT "TemplateSubCategory_mainCategoryId_fkey"
+           FOREIGN KEY ("mainCategoryId") REFERENCES "TemplateMainCategory"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+       END IF;
+     END $$;`,
+  );
+
+  // Nieuwe FK-kolommen op Template + datamigratie vanuit de oude enum-kolom.
+  await prisma.$executeRawUnsafe(`ALTER TABLE "Template" ADD COLUMN IF NOT EXISTS "mainCategoryId" TEXT`);
+  await prisma.$executeRawUnsafe(`ALTER TABLE "Template" ADD COLUMN IF NOT EXISTS "subCategoryId" TEXT`);
+
+  // Standaardcategorieën (zelfde vaste id's als prisma/seed.ts).
+  await prisma.$executeRawUnsafe(`
+    INSERT INTO "TemplateMainCategory" ("id", "name", "slug", "order", "createdAt", "updatedAt") VALUES
+      ('cmcat-hr-0000000000000001', 'HR',         'HR',     1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+      ('cmcat-fin-000000000000002', 'Financieel', 'FIN',    2, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+      ('cmcat-ink-000000000000003', 'Inkoop',     'INKOOP', 3, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+      ('cmcat-alg-000000000000004', 'Algemeen',   'ALG',    4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    ON CONFLICT ("slug") DO NOTHING`);
+
+  // Bestaande templates overzetten vanuit de oude enum-kolom (indien aanwezig).
+  await prisma.$executeRawUnsafe(
+    `DO $$ BEGIN
+       IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'Template' AND column_name = 'category') THEN
+         UPDATE "Template" SET "mainCategoryId" = 'cmcat-hr-0000000000000001'  WHERE "mainCategoryId" IS NULL AND "category"::text = 'HR';
+         UPDATE "Template" SET "mainCategoryId" = 'cmcat-fin-000000000000002' WHERE "mainCategoryId" IS NULL AND "category"::text = 'FIN';
+         UPDATE "Template" SET "mainCategoryId" = 'cmcat-ink-000000000000003' WHERE "mainCategoryId" IS NULL AND "category"::text = 'INKOOP';
+         UPDATE "Template" SET "mainCategoryId" = 'cmcat-alg-000000000000004' WHERE "mainCategoryId" IS NULL AND "category"::text = 'ALG';
+       END IF;
+     END $$;`,
+  );
+
+  await prisma.$executeRawUnsafe(
+    `DO $$ BEGIN
+       IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Template_mainCategoryId_fkey') THEN
+         ALTER TABLE "Template" ADD CONSTRAINT "Template_mainCategoryId_fkey"
+           FOREIGN KEY ("mainCategoryId") REFERENCES "TemplateMainCategory"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+       END IF;
+     END $$;`,
+  );
+  await prisma.$executeRawUnsafe(
+    `DO $$ BEGIN
+       IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Template_subCategoryId_fkey') THEN
+         ALTER TABLE "Template" ADD CONSTRAINT "Template_subCategoryId_fkey"
+           FOREIGN KEY ("subCategoryId") REFERENCES "TemplateSubCategory"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+       END IF;
+     END $$;`,
+  );
+
+  // ── Bestaande reconcilieerbare kolommen ──
 
   await prisma.$executeRawUnsafe(`ALTER TABLE "RunStep" ADD COLUMN IF NOT EXISTS "parentRunStepId" TEXT`);
   await prisma.$executeRawUnsafe(`ALTER TABLE "RunStep" ADD COLUMN IF NOT EXISTS "threadInitiatorId" TEXT`);

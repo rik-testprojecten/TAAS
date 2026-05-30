@@ -131,6 +131,21 @@ async function main() {
     },
   });
 
+  // Template-hoofdcategorieën (vaste id's gedeeld met schema-reconcile).
+  const mainCategories = [
+    { id: CATEGORY_SLUGS.HR, name: "HR", slug: "HR", order: 1 },
+    { id: CATEGORY_SLUGS.FIN, name: "Financieel", slug: "FIN", order: 2 },
+    { id: CATEGORY_SLUGS.INKOOP, name: "Inkoop", slug: "INKOOP", order: 3 },
+    { id: CATEGORY_SLUGS.ALG, name: "Algemeen", slug: "ALG", order: 4 },
+  ];
+  for (const c of mainCategories) {
+    await prisma.templateMainCategory.upsert({
+      where: { id: c.id },
+      update: {},
+      create: c,
+    });
+  }
+
   // Templates
   const hrTemplate = await prisma.template.upsert({
     where: { id: "tpl-hr-instroom" },
