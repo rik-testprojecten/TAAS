@@ -59,11 +59,21 @@ export async function POST(req: NextRequest) {
     const candidates = await getTenantLoginCandidates(email);
     let tenantPwMatches = 0;
     let tenantActiveRows = 0;
-    for (const c of candidates) {
-      if (c.isBlocked || !c.tenantActive) continue;
-      tenantActiveRows++;
+    const activeCandidates = candidates.filter((c) => !c.isBlocked && c.tenantActive);
+    tenantActiveRows = activeCandidates.length;
+
+    // Controleer of het wachtwoord bij minstens één klant-account klopt.
+    // Als dat zo is, tonen we ALLE actieve accounts voor dit e-mailadres zodat
+    // een gebruiker die bij meerdere klanten hoort (eventueel met verschillende
+    // wachtwoorden) altijd de keuze krijgt. Het wachtwoord per gekozen account
+    // wordt daarna opnieuw geverifieerd in auth.ts bij het definitieve signIn.
+    for (const c of activeCandidates) {
       if (await bcrypt.compare(password, c.password)) {
         tenantPwMatches++;
+      }
+    }
+    if (tenantPwMatches > 0) {
+      for (const c of activeCandidates) {
         accounts.push({
           type: "tenant",
           id: c.id,
