@@ -258,6 +258,38 @@ export default function TemplatesPage() {
         </div>
       )}
 
+      {/* ── Inline category editor modal ── */}
+      {editingCategory && (() => {
+        const t = templates.find(t => t.id === editingCategory)!;
+        return (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl p-6 w-full max-w-sm">
+              <h2 className="font-semibold text-lg mb-1">Categorie wijzigen</h2>
+              <p className="text-sm text-slate-500 mb-4">"{t.name}"</p>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Hoofdcategorie</label>
+                  <select className="input" value={categoryForm.mainCategory} onChange={e => setCategoryForm({ mainCategory: e.target.value, subCategory: "" })}>
+                    {MODULES.map(m => <option key={m.key} value={m.key}>{m.emoji} {m.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Subcategorie</label>
+                  <select className="input" value={categoryForm.subCategory} onChange={e => setCategoryForm(f => ({ ...f, subCategory: e.target.value }))}>
+                    <option value="">— geen —</option>
+                    {getSubmodules(categoryForm.mainCategory).map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+                  </select>
+                </div>
+                <div className="flex gap-3 pt-1">
+                  <button onClick={() => saveCategory(editingCategory)} disabled={saving} className="btn-primary flex-1">{saving ? "Opslaan..." : "Opslaan"}</button>
+                  <button onClick={() => setEditingCategory(null)} className="btn-secondary flex-1">Annuleren</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* ── Version modal ── */}
       {showVersionFor && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
@@ -421,22 +453,58 @@ export default function TemplatesPage() {
                 </div>
               </div>
             </div>
-          ))}
-          {ungrouped.length > 0 && (
-            <div>
-              <h2 className="font-semibold text-slate-500 mb-3">Overig</h2>
-              <div className="grid gap-3">
-                {ungrouped.map((t) => (
-                  <div key={t.id} className="card p-5">
-                    <span className="font-medium">{t.name}</span>
-                    <span className="ml-2 text-xs text-slate-400">{t.mainCategory}</span>
-                  </div>
-                ))}
-              </div>
+          );
+        })}
+
+        {/* Templates with unknown main category */}
+        {templates.filter(t => !MODULES.some(m => m.key === t.mainCategory)).length > 0 && (
+          <div className="border border-slate-200 rounded-xl overflow-hidden">
+            <div className="px-5 py-3.5 bg-slate-50 font-semibold text-slate-500 text-sm">Onbekende categorie</div>
+            <div className="p-4 space-y-2">
+              {templates.filter(t => !MODULES.some(m => m.key === t.mainCategory)).map(t => (
+                <TemplateCard key={t.id} t={t} onVersion={() => setShowVersionFor(t.id)} onLinks={() => setEditingLinks(t.id)} onCategory={() => { setEditingCategory(t.id); setCategoryForm({ mainCategory: "HRM", subCategory: "" }); }} />
+              ))}
             </div>
-          )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function TemplateCard({ t, onVersion, onLinks, onCategory }: {
+  t: Template;
+  onVersion: () => void;
+  onLinks: () => void;
+  onCategory: () => void;
+}) {
+  const latestVersion = t.versions?.[0];
+  return (
+    <div className="bg-white border border-slate-200 rounded-lg p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
+            <span className="font-semibold text-slate-900 text-sm">{t.name}</span>
+            {latestVersion && <span className="text-xs text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">{latestVersion.version}</span>}
+          </div>
+          {t.description && <p className="text-xs text-slate-500 mb-1">{t.description}</p>}
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="text-xs text-slate-400">
+              {t.versions?.length ?? 0} versie{t.versions?.length !== 1 ? "s" : ""} · {latestVersion?.changelog ? `${latestVersion.changelog} · ` : ""}Aangemaakt
+            </span>
+            {t.moduleLinks.length > 0 ? (
+              <span className="text-xs text-emerald-600">{t.moduleLinks.length} module-koppeling{t.moduleLinks.length !== 1 ? "en" : ""}</span>
+            ) : (
+              <span className="text-xs text-amber-500">Geen module-koppelingen</span>
+            )}
+          </div>
         </div>
-      )}
+        <div className="flex gap-1.5 shrink-0">
+          <button onClick={onCategory} className="btn-secondary text-xs px-2 py-1">Categorie</button>
+          <button onClick={onLinks} className="btn-secondary text-xs px-2 py-1">Modules</button>
+          <button onClick={onVersion} className="btn-secondary text-xs px-2 py-1">+ Versie</button>
+        </div>
+      </div>
     </div>
   );
 }

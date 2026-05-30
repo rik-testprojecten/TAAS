@@ -373,43 +373,60 @@ export default function OnboardingPage() {
                   : `Selecteer templates die je als flow wilt toevoegen aan jouw ${s.selectedPhases.join("/")} fase(s).`}
               </p>
               {templates.length > 0 ? (
-                <div className="space-y-4">
-                  {MODULES.filter(mod => templates.some(t => t.mainCategory === mod.key)).map(mod => (
-                    <div key={mod.key}>
-                      <div className="flex items-center gap-1.5 mb-2">
-                        <span className="text-sm">{mod.emoji}</span>
-                        <span className="text-sm font-semibold text-slate-700">{mod.label}</span>
-                      </div>
-                      <div className="space-y-2 ml-1">
-                        {templates.filter(t => t.mainCategory === mod.key).map((t) => {
-                          const version = t.versions?.[0];
-                          return (
-                            <label key={t.id} className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${s.selectedTemplates.includes(t.id) ? "border-primary-300 bg-primary-50" : "border-slate-200 hover:bg-slate-50"}`}>
-                              <input
-                                type="checkbox"
-                                checked={s.selectedTemplates.includes(t.id)}
-                                onChange={() => setS((prev) => ({
-                                  ...prev,
-                                  selectedTemplates: prev.selectedTemplates.includes(t.id)
-                                    ? prev.selectedTemplates.filter((id) => id !== t.id)
-                                    : [...prev.selectedTemplates, t.id],
-                                }))}
-                                className="rounded mt-0.5"
-                              />
-                              <div>
-                                <div className="flex items-center gap-2">
-                                  <span className="text-sm font-medium text-slate-800">{t.name}</span>
-                                  {t.subCategory && <span className="text-xs bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">{getSubmoduleLabel(t.subCategory)}</span>}
-                                </div>
-                                {t.description && <div className="text-xs text-slate-500 mt-0.5">{t.description}</div>}
-                                {version && <div className="text-xs text-slate-400 mt-0.5">{version._count?.steps ?? 0} stappen · versie {version.version}</div>}
+                <div className="space-y-5">
+                  {MODULES.filter(mod => templates.some(t => t.mainCategory === mod.key)).map(mod => {
+                    const modTemplates = templates.filter(t => t.mainCategory === mod.key);
+                    return (
+                      <div key={mod.key}>
+                        {/* Main category header */}
+                        <div className="flex items-center gap-2 mb-2.5 pb-1.5 border-b border-slate-200">
+                          <span>{mod.emoji}</span>
+                          <span className="text-sm font-semibold text-slate-700">{mod.label}</span>
+                          <span className="text-xs text-slate-400">{modTemplates.length} template{modTemplates.length !== 1 ? "s" : ""}</span>
+                        </div>
+                        {/* Grouped by subcategory */}
+                        <div className="space-y-3 ml-1">
+                          {mod.submodules.filter(sub => modTemplates.some(t => t.subCategory === sub.key)).map(sub => (
+                            <div key={sub.key}>
+                              <div className="flex items-center gap-1.5 mb-1.5">
+                                <span className="w-1 h-1 rounded-full bg-slate-400 shrink-0" />
+                                <span className="text-xs font-medium text-slate-500">{sub.label}</span>
                               </div>
-                            </label>
-                          );
-                        })}
+                              <div className="space-y-1.5 ml-3">
+                                {modTemplates.filter(t => t.subCategory === sub.key).map((t) => {
+                                  const version = t.versions?.[0];
+                                  return (
+                                    <label key={t.id} className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${s.selectedTemplates.includes(t.id) ? "border-primary-300 bg-primary-50" : "border-slate-200 hover:bg-slate-50"}`}>
+                                      <input type="checkbox" checked={s.selectedTemplates.includes(t.id)} onChange={() => setS((prev) => ({ ...prev, selectedTemplates: prev.selectedTemplates.includes(t.id) ? prev.selectedTemplates.filter((id) => id !== t.id) : [...prev.selectedTemplates, t.id] }))} className="rounded mt-0.5" />
+                                      <div>
+                                        <div className="text-sm font-medium text-slate-800">{t.name}</div>
+                                        {t.description && <div className="text-xs text-slate-500 mt-0.5">{t.description}</div>}
+                                        {version && <div className="text-xs text-slate-400 mt-0.5">{version._count?.steps ?? 0} stappen · versie {version.version}</div>}
+                                      </div>
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ))}
+                          {/* Templates without subcategory */}
+                          {modTemplates.filter(t => !t.subCategory || !mod.submodules.some(s => s.key === t.subCategory)).map((t) => {
+                            const version = t.versions?.[0];
+                            return (
+                              <label key={t.id} className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${s.selectedTemplates.includes(t.id) ? "border-primary-300 bg-primary-50" : "border-slate-200 hover:bg-slate-50"}`}>
+                                <input type="checkbox" checked={s.selectedTemplates.includes(t.id)} onChange={() => setS((prev) => ({ ...prev, selectedTemplates: prev.selectedTemplates.includes(t.id) ? prev.selectedTemplates.filter((id) => id !== t.id) : [...prev.selectedTemplates, t.id] }))} className="rounded mt-0.5" />
+                                <div>
+                                  <div className="text-sm font-medium text-slate-800">{t.name}</div>
+                                  {t.description && <div className="text-xs text-slate-500 mt-0.5">{t.description}</div>}
+                                  {version && <div className="text-xs text-slate-400 mt-0.5">{version._count?.steps ?? 0} stappen · versie {version.version}</div>}
+                                </div>
+                              </label>
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="text-center py-8 text-slate-400 text-sm border-2 border-dashed border-slate-200 rounded-xl">
