@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import type { SessionUser } from "@/types";
 import { logger } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
+import { ensureSchema } from "@/lib/schema-reconcile";
 
 export type ApiContext = {
   user: SessionUser;
@@ -21,6 +22,10 @@ export async function requireTenantAuth(
     logger.warn({ userId: session.user.id, userType: session.user.userType }, "Forbidden — wrong user type");
     return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
   }
+  // Zorg dat de reconcilieerbare kolommen bestaan voordat we ze bevragen
+  // (voorkomt P2022 op een via `db push` aangemaakte database, ook voor reeds
+  // bestaande sessies die direct een beveiligde route raken).
+  await ensureSchema();
   // Controleer dat het account nog actief, niet-geblokkeerd en aan deze klant
   // gekoppeld is. Hiermee werken blokkeren/verwijderen direct door, ook voor
   // reeds bestaande sessies, en blijft kruis-klant-toegang uitgesloten.

@@ -3,6 +3,7 @@ import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { prisma } from "./src/lib/prisma";
 import { verifyToken } from "./src/lib/totp";
+import { ensureSchema } from "./src/lib/schema-reconcile";
 
 const useSecureCookies = process.env.NODE_ENV === "production";
 
@@ -42,6 +43,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const password = credentials.password as string;
         const accountId = (credentials.accountId as string | undefined) || undefined;
         const totp = (credentials.totp as string | undefined) || undefined;
+
+        // Zorg dat de blokkeer-/2FA-kolommen bestaan voordat we Tenant/TenantUser
+        // bevragen (voorkomt P2022 op een via `db push` aangemaakte database).
+        await ensureSchema();
 
         // ─── Platform-gebruiker ───────────────────────────────────────────
         // Alleen proberen als er geen specifieke klant is gekozen, of het

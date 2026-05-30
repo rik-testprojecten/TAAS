@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { ensureSchema } from "@/lib/schema-reconcile";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 
@@ -35,6 +36,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Ongeldige invoer" }, { status: 400 });
   }
   const { email, password } = parsed.data;
+
+  // Zorg dat de blokkeer-/2FA-kolommen bestaan voordat we Tenant/TenantUser
+  // bevragen (voorkomt P2022 op een via `db push` aangemaakte database).
+  await ensureSchema();
 
   const accounts: ResolvedAccount[] = [];
 
