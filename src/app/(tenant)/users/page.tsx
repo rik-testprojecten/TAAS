@@ -21,6 +21,7 @@ type User = { id: string; name: string; email: string; roles: string[]; isActive
 export default function UsersPage() {
   const { data: session } = useSession();
   const currentUserId = session?.user?.id;
+  const isAdmin = (session?.user?.roles ?? []).includes("TENANT_ADMIN");
   const toast = useToast();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,7 +31,7 @@ export default function UsersPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [emailDomain, setEmailDomain] = useState<string | null>(null);
-  const [editUser, setEditUser] = useState<{ id: string; name: string; roles: string[] } | null>(null);
+  const [editUser, setEditUser] = useState<{ id: string; name: string; email: string; roles: string[] } | null>(null);
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState("");
 
@@ -120,10 +121,12 @@ export default function UsersPage() {
     setEditSaving(true);
     setEditError("");
     try {
+      const payload: Record<string, unknown> = { name: editUser.name, email: editUser.email };
+      if (isAdmin) payload.roles = editUser.roles;
       const res = await fetch(`/api/users/${editUser.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: editUser.name, roles: editUser.roles }),
+        body: JSON.stringify(payload),
       });
       if (res.ok) {
         setEditUser(null);
@@ -154,10 +157,12 @@ export default function UsersPage() {
           <h1 className="text-2xl font-bold text-slate-900">Gebruikers</h1>
           <p className="text-slate-500 text-sm mt-1">{users.length} gebruiker{users.length !== 1 ? "s" : ""}</p>
         </div>
-        <button onClick={() => setShowNew(true)} className="btn-primary flex items-center gap-2 self-start sm:self-auto">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-          Gebruiker toevoegen
-        </button>
+        {isAdmin && (
+          <button onClick={() => setShowNew(true)} className="btn-primary flex items-center gap-2 self-start sm:self-auto">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+            Gebruiker toevoegen
+          </button>
+        )}
       </header>
 
       {inviteResult && (
@@ -223,13 +228,15 @@ export default function UsersPage() {
                   </td>
                   <td>
                     <div className="flex items-center gap-2 justify-end">
-                      <button
-                        onClick={() => setEditUser({ id: user.id, name: user.name, roles: user.roles })}
-                        className="btn-secondary !px-3 !py-1.5 text-xs"
-                      >
-                        Bewerken
-                      </button>
-                      {user.id !== currentUserId && (
+                      {(isAdmin || user.id === currentUserId) && (
+                        <button
+                          onClick={() => setEditUser({ id: user.id, name: user.name, email: user.email, roles: user.roles })}
+                          className="btn-secondary !px-3 !py-1.5 text-xs"
+                        >
+                          Bewerken
+                        </button>
+                      )}
+                      {isAdmin && user.id !== currentUserId && (
                         <>
                           <button
                             onClick={() => toggleBlocked(user.id, !!user.isBlocked)}
@@ -335,7 +342,7 @@ export default function UsersPage() {
         footer={
           <>
             <button type="button" onClick={() => setEditUser(null)} className="btn-secondary">Annuleren</button>
-            <button type="submit" form="edit-user-form" disabled={editSaving || !editUser || editUser.roles.length === 0} className="btn-primary">
+            <button type="submit" form="edit-user-form" disabled={editSaving || !editUser || (isAdmin && (editUser?.roles.length ?? 0) === 0)} className="btn-primary">
               {editSaving ? "Opslaan..." : "Opslaan"}
             </button>
           </>
@@ -350,27 +357,43 @@ export default function UsersPage() {
               value={editUser.name}
               onChange={e => setEditUser({ ...editUser, name: e.target.value })}
             />
-            <fieldset>
-              <legend className="label">Rollen *</legend>
-              <div className="space-y-2">
-                {ALL_ROLES.map((role) => (
-                  <label key={role} className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={editUser.roles.includes(role)}
-                      onChange={() => setEditUser({
-                        ...editUser,
-                        roles: editUser.roles.includes(role)
-                          ? editUser.roles.filter(r => r !== role)
-                          : [...editUser.roles, role],
-                      })}
-                      className="rounded"
-                    />
-                    {ROLE_LABELS[role]}
-                  </label>
-                ))}
-              </div>
-            </fieldset>
+            <div>
+              <Field
+                label="E-mailadres"
+                type="email"
+                required
+                value={editUser.email}
+                onChange={e => setEditUser({ ...editUser, email: e.target.value })}
+              />
+              {editUser.id !== currentUserId && (
+                <p className="text-xs text-slate-400 mt-1">
+                  Als dit e-mailadres bij meerdere omgevingen is geregistreerd, kan alleen de gebruiker het zelf wijzigen.
+                </p>
+              )}
+            </div>
+            {isAdmin && (
+              <fieldset>
+                <legend className="label">Rollen *</legend>
+                <div className="space-y-2">
+                  {ALL_ROLES.map((role) => (
+                    <label key={role} className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={editUser.roles.includes(role)}
+                        onChange={() => setEditUser({
+                          ...editUser,
+                          roles: editUser.roles.includes(role)
+                            ? editUser.roles.filter(r => r !== role)
+                            : [...editUser.roles, role],
+                        })}
+                        className="rounded"
+                      />
+                      {ROLE_LABELS[role]}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+            )}
             {editError && <div role="alert" className="text-red-600 text-sm bg-red-50 px-3 py-2 rounded">{editError}</div>}
           </form>
         )}

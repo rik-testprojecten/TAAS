@@ -52,6 +52,9 @@ export default function TenantsPage() {
   const [contactForm, setContactForm] = useState(emptyForm);
   const [contactSaving, setContactSaving] = useState(false);
   const [contactError, setContactError] = useState("");
+  const [editContact, setEditContact] = useState<TenantUser | null>(null);
+  const [editContactSaving, setEditContactSaving] = useState(false);
+  const [editContactError, setEditContactError] = useState("");
 
   useEffect(() => { load(); }, []);
 
@@ -152,6 +155,26 @@ export default function TenantsPage() {
     load();
   }
 
+  async function saveEditContact(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selectedTenant || !editContact) return;
+    setEditContactSaving(true);
+    setEditContactError("");
+    const res = await fetch(`/api/platform/tenants/${selectedTenant.id}/users/${editContact.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: editContact.name, email: editContact.email, roles: editContact.roles }),
+    });
+    if (res.ok) {
+      setEditContact(null);
+      openContacts(selectedTenant);
+    } else {
+      const data = await res.json();
+      setEditContactError(typeof data.error === "string" ? data.error : "Er is een fout opgetreden");
+    }
+    setEditContactSaving(false);
+  }
+
   function toggleRole(role: string) {
     setContactForm(f => ({
       ...f,
@@ -199,6 +222,77 @@ export default function TenantsPage() {
         </div>
       )}
 
+      {/* Contactpersoon bewerken modal */}
+      {editContact && selectedTenant && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md">
+            <h2 className="font-semibold text-lg mb-4">Contactpersoon bewerken</h2>
+            <form onSubmit={saveEditContact} className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium mb-1">Naam *</label>
+                <input
+                  className="input text-sm"
+                  value={editContact.name}
+                  onChange={e => setEditContact({ ...editContact, name: e.target.value })}
+                  required
+                  minLength={2}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1">E-mailadres *</label>
+                <input
+                  type="email"
+                  className="input text-sm"
+                  value={editContact.email}
+                  onChange={e => setEditContact({ ...editContact, email: e.target.value })}
+                  required
+                />
+                <p className="text-xs text-slate-400 mt-1">
+                  Als dit e-mailadres bij meerdere omgevingen is geregistreerd, kan alleen de gebruiker het zelf wijzigen.
+                </p>
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-2">Rol(len) *</label>
+                <div className="flex flex-wrap gap-2">
+                  {ALL_ROLES.map(role => (
+                    <button
+                      key={role}
+                      type="button"
+                      onClick={() => setEditContact({
+                        ...editContact,
+                        roles: editContact.roles.includes(role)
+                          ? editContact.roles.filter(r => r !== role)
+                          : [...editContact.roles, role],
+                      })}
+                      className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
+                        editContact.roles.includes(role)
+                          ? "bg-blue-600 text-white border-blue-600"
+                          : "bg-white text-slate-600 border-slate-200 hover:border-blue-300"
+                      }`}
+                    >
+                      {ROLE_LABELS[role]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {editContactError && <div className="text-red-600 text-xs bg-red-50 px-3 py-2 rounded">{editContactError}</div>}
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="submit"
+                  disabled={editContactSaving || editContact.roles.length === 0}
+                  className="btn-primary flex-1 text-sm disabled:opacity-50"
+                >
+                  {editContactSaving ? "Opslaan..." : "Opslaan"}
+                </button>
+                <button type="button" onClick={() => setEditContact(null)} className="btn-secondary flex-1 text-sm">
+                  Annuleren
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Contactpersonen modal */}
       {selectedTenant && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -235,6 +329,12 @@ export default function TenantsPage() {
                         <span className={`badge text-xs ${c.isActive ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
                           {c.isActive ? "Actief" : "Inactief"}
                         </span>
+                        <button
+                          onClick={() => { setEditContact({ ...c }); setEditContactError(""); }}
+                          className="text-xs text-slate-400 hover:text-slate-700"
+                        >
+                          Bewerken
+                        </button>
                         {c.isActive && (
                           <button onClick={() => { if (confirm(`${c.name} deactiveren?`)) deactivateContact(c.id); }} className="text-xs text-slate-400 hover:text-red-500">
                             Deactiveren
