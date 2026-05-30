@@ -425,7 +425,7 @@ export function TenantSidebar({
   );
 }
 
-export function PlatformSidebar({ userName }: { userName: string }) {
+function PlatformSidebarContent({ userName, onNavigate }: { userName: string; onNavigate?: () => void }) {
   const platformItems: NavItem[] = [
     {
       href: "/admin",
@@ -445,7 +445,7 @@ export function PlatformSidebar({ userName }: { userName: string }) {
   ];
 
   return (
-    <aside className="fixed left-0 top-0 h-full w-60 bg-forest-800 flex flex-col z-10">
+    <>
       <div className="px-4 py-5 border-b border-forest-900">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
@@ -460,7 +460,7 @@ export function PlatformSidebar({ userName }: { userName: string }) {
         </div>
       </div>
       <nav className="flex-1 px-3 py-4 space-y-1" aria-label="Platform navigatie">
-        {platformItems.map((item) => <NavLink key={item.href} item={item} />)}
+        {platformItems.map((item) => <NavLink key={item.href} item={item} onNavigate={onNavigate} />)}
       </nav>
       <div className="px-3 py-4 border-t border-forest-900">
         <div className="flex items-center gap-3 px-3 py-2 mb-2">
@@ -471,7 +471,7 @@ export function PlatformSidebar({ userName }: { userName: string }) {
         </div>
         <button
           onClick={() => signOut({ callbackUrl: "/login" })}
-          className="w-full flex items-center gap-3 px-3 py-2 text-slate-400 hover:text-white hover:bg-forest-700 rounded-lg text-sm transition-colors"
+          className="w-full flex items-center gap-3 px-3 py-2 text-slate-400 hover:text-white hover:bg-forest-700 rounded-lg text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-400"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -479,6 +479,76 @@ export function PlatformSidebar({ userName }: { userName: string }) {
           Uitloggen
         </button>
       </div>
-    </aside>
+    </>
+  );
+}
+
+export function PlatformSidebar({ userName }: { userName: string }) {
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const pathname = usePathname();
+
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") setMobileOpen(false); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [mobileOpen]);
+
+  return (
+    <>
+      {/* Mobile top bar */}
+      <div className="fixed top-0 left-0 right-0 h-14 bg-forest-800 flex items-center px-3 gap-3 z-40 md:hidden shadow-lg">
+        <button
+          className="text-white p-2 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 shrink-0"
+          onClick={() => setMobileOpen(true)}
+          aria-label="Menu openen"
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+        <span className="text-white font-semibold text-sm">TAAS Platform</span>
+      </div>
+
+      {/* Mobile overlay */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={() => setMobileOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Desktop sidebar */}
+      <aside className="fixed left-0 top-0 h-full w-60 bg-forest-800 flex-col z-30 hidden md:flex">
+        <PlatformSidebarContent userName={userName} />
+      </aside>
+
+      {/* Mobile drawer */}
+      <aside
+        className={cn(
+          "fixed left-0 top-0 h-full w-72 bg-forest-800 flex flex-col z-50 md:hidden transition-transform duration-200",
+          mobileOpen ? "translate-x-0" : "-translate-x-full"
+        )}
+        aria-label="Platform navigatiemenu"
+      >
+        <div className="flex items-center justify-end px-3 pt-3">
+          <button
+            onClick={() => setMobileOpen(false)}
+            className="text-forest-300 hover:text-white p-1 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-400"
+            aria-label="Menu sluiten"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <PlatformSidebarContent userName={userName} onNavigate={() => setMobileOpen(false)} />
+      </aside>
+    </>
   );
 }
