@@ -1,4 +1,4 @@
-import type { PrismaClient, TemplateCategory } from "@prisma/client";
+import type { PrismaClient } from "@prisma/client";
 import { HRM_TEMPLATES } from "./hrm";
 import { FIN_TEMPLATES } from "./fin";
 import { CRM_TEMPLATES } from "./crm";
@@ -45,11 +45,11 @@ export async function seedStandardTemplates(
     await prisma.template.upsert({
       where: { id: templateId(t.key) },
       // Bestaande template: inhoud bijwerken, maar isActive met rust laten.
-      update: { name: t.name, category: t.category as TemplateCategory, description: t.description },
+      update: { name: t.name, category: t.category, description: t.description },
       create: {
         id: templateId(t.key),
         name: t.name,
-        category: t.category as TemplateCategory,
+        category: t.category,
         description: t.description,
         isActive: opts.asDraft ? false : true,
       },

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requirePlatformAuth } from "@/lib/api-helpers";
-import { MAIN_CATEGORY_KEYS, SUB_CATEGORY_KEYS } from "@/lib/modules";
 import { z } from "zod";
 
 const createSchema = z.object({
@@ -9,6 +8,7 @@ const createSchema = z.object({
   category: z.string().optional(),
   description: z.string().optional(),
   isActive: z.boolean().optional(),
+  moduleLinks: z.array(z.string()).optional(),
 });
 
 export async function GET(req: NextRequest) {
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
     data: {
       ...templateData,
       moduleLinks: moduleLinks?.length
-        ? { create: moduleLinks.map((key) => ({ moduleKey: key })) }
+        ? { create: moduleLinks.map((key: string) => ({ moduleKey: key })) }
         : undefined,
     },
     include: { moduleLinks: { select: { moduleKey: true } } },
