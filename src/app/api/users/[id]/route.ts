@@ -64,7 +64,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       // Een gedeeld e-mailadres (bij meerdere klantomgevingen) mag alleen de
       // gebruiker zelf wijzigen — niet een beheerder van één omgeving.
       if (!isSelf) {
-        const sharedCount = await prisma.tenantUser.count({ where: { email: targetUser.email } });
+        const sharedCount = await prisma.tenantUser.count({
+          where: { email: { equals: targetUser.email, mode: "insensitive" } },
+        });
         if (sharedCount > 1) {
           return NextResponse.json(
             { error: "Dit e-mailadres is bij meerdere omgevingen geregistreerd. Alleen de gebruiker zelf mag dit wijzigen." },

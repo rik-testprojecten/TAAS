@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requirePlatformAuth } from "@/lib/api-helpers";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
+import { normalizeEmail } from "@/lib/email";
 
 const createSchema = z.object({
   name: z.string().min(2),
@@ -39,12 +40,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const parsed = createSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
-  const existing = await prisma.tenantUser.findFirst({ where: { tenantId, email: parsed.data.email } });
+  const email = normalizeEmail(parsed.data.email);
+  const existing = await prisma.tenantUser.findFirst({
+    where: { tenantId, email: { equals: email, mode: "insensitive" } },
+  });
   if (existing) return NextResponse.json({ error: "E-mailadres al in gebruik" }, { status: 409 });
 
   const hashed = await bcrypt.hash(parsed.data.password, 10);
   const user = await prisma.tenantUser.create({
-    data: { ...parsed.data, password: hashed, tenantId },
+    data: { ...parsed.data, email, password: hashed, tenantId },
     select: { id: true, name: true, email: true, roles: true, isActive: true },
   });
   return NextResponse.json(user, { status: 201 });

@@ -21,8 +21,17 @@ export async function validateTenantCredentials(
   password: string,
   accountId: string
 ): Promise<MfaTenantUser | null> {
+  // accountId (tenantUser.id) pint de exacte rij al; de e-mailcheck is een
+  // extra waarborg en moet daarom case-insensitief zijn — anders mislukt de
+  // 2FA-koppeling wanneer de opgeslagen schrijfwijze afwijkt van wat de
+  // gebruiker typt (bijv. "Marisha@" vs "marisha@").
   const tu = await prisma.tenantUser.findFirst({
-    where: { id: accountId, email, isActive: true, isBlocked: false },
+    where: {
+      id: accountId,
+      email: { equals: email, mode: "insensitive" },
+      isActive: true,
+      isBlocked: false,
+    },
     include: { tenant: { select: { name: true, isActive: true, mfaRequired: true } } },
   });
   if (!tu || !tu.tenant.isActive) return null;

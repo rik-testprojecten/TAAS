@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getTenantLoginCandidates } from "@/lib/login-queries";
 import { logger } from "@/lib/logger";
+import { normalizeEmail } from "@/lib/email";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 
@@ -36,7 +37,7 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: "Ongeldige invoer" }, { status: 400 });
   }
-  const email = parsed.data.email.trim();
+  const email = normalizeEmail(parsed.data.email);
   const { password } = parsed.data;
 
   try {
