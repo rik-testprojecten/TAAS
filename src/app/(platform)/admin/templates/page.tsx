@@ -4,7 +4,7 @@ import { formatDate } from "@/lib/utils";
 import { MODULES, getSubmoduleLabel } from "@/lib/modules";
 
 type Template = {
-  id: string; name: string; description?: string; isActive: boolean; createdAt: string; updatedAt: string;
+  id: string; name: string; category?: string; description?: string; isActive: boolean; createdAt: string; updatedAt: string;
   versions?: { version: string; changelog?: string; createdAt: string }[];
   moduleLinks?: { moduleKey: string }[];
 };
@@ -24,6 +24,9 @@ export default function TemplatesPage() {
   const [editVersionId, setEditVersionId] = useState<string | null>(null);
   const [showModulesFor, setShowModulesFor] = useState<string | null>(null);
   const [moduleForm, setModuleForm] = useState<string[]>([]);
+  const [editingCategory, setEditingCategory] = useState<string | null>(null);
+  const [editingLinks, setEditingLinks] = useState<string | null>(null);
+  const [categoryForm, setCategoryForm] = useState({ category: "ALG" });
   const [form, setForm] = useState({ name: "", category: "ALG", description: "", isActive: true, moduleLinks: [] as string[] });
   const [versionForm, setVersionForm] = useState({ version: "v1.0", changelog: "", steps: [{ order: 1, title: "", instruction: "", expectedResult: "" }] });
   const [saving, setSaving] = useState(false);
@@ -168,6 +171,18 @@ export default function TemplatesPage() {
       : [...new Set([...prev, ...subKeys])]);
   }
 
+  async function saveCategory(templateId: string) {
+    setSaving(true);
+    await fetch(`/api/platform/templates/${templateId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ category: categoryForm.category }),
+    });
+    setEditingCategory(null);
+    load();
+    setSaving(false);
+  }
+
   async function saveModules(e: React.FormEvent) {
     e.preventDefault();
     if (!showModulesFor) return;
@@ -278,16 +293,9 @@ export default function TemplatesPage() {
               <p className="text-sm text-slate-500 mb-4">"{t.name}"</p>
               <div className="space-y-3">
                 <div>
-                  <label className="block text-sm font-medium mb-1">Hoofdcategorie</label>
-                  <select className="input" value={categoryForm.mainCategory} onChange={e => setCategoryForm({ mainCategory: e.target.value, subCategory: "" })}>
+                  <label className="block text-sm font-medium mb-1">Categorie</label>
+                  <select className="input" value={categoryForm.category} onChange={e => setCategoryForm({ category: e.target.value })}>
                     {MODULES.map(m => <option key={m.key} value={m.key}>{m.emoji} {m.label}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Subcategorie</label>
-                  <select className="input" value={categoryForm.subCategory} onChange={e => setCategoryForm(f => ({ ...f, subCategory: e.target.value }))}>
-                    <option value="">— geen —</option>
-                    {getSubmodules(categoryForm.mainCategory).map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
                   </select>
                 </div>
                 <div className="flex gap-3 pt-1">
@@ -414,11 +422,8 @@ export default function TemplatesPage() {
                 <div>
                   <div className="flex items-center gap-3 mb-1 flex-wrap">
                     <h3 className="font-semibold text-slate-900">{t.name}</h3>
-                    {t.mainCategory && (
-                      <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded">{t.mainCategory.name}</span>
-                    )}
-                    {t.subCategory && (
-                      <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded">{t.subCategory.name}</span>
+                    {t.category && (
+                      <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded">{t.category}</span>
                     )}
                     {latestVersion && <span className="text-xs text-primary-600 bg-primary-50 px-2 py-0.5 rounded">{latestVersion.version}</span>}
                     {t.isActive
@@ -466,13 +471,12 @@ export default function TemplatesPage() {
           );
         })}
 
-        {/* Templates with unknown main category */}
-        {templates.filter(t => !MODULES.some(m => m.key === t.mainCategory)).length > 0 && (
+        {templates.filter(t => !MODULES.some(m => m.key === t.category)).length > 0 && (
           <div className="border border-slate-200 rounded-xl overflow-hidden">
             <div className="px-5 py-3.5 bg-slate-50 font-semibold text-slate-500 text-sm">Onbekende categorie</div>
             <div className="p-4 space-y-2">
-              {templates.filter(t => !MODULES.some(m => m.key === t.mainCategory)).map(t => (
-                <TemplateCard key={t.id} t={t} onVersion={() => setShowVersionFor(t.id)} onLinks={() => setEditingLinks(t.id)} onCategory={() => { setEditingCategory(t.id); setCategoryForm({ mainCategory: "HRM", subCategory: "" }); }} />
+              {templates.filter(t => !MODULES.some(m => m.key === t.category)).map(t => (
+                <div key={t.id} className="text-sm text-slate-700">{t.name}</div>
               ))}
             </div>
           </div>
