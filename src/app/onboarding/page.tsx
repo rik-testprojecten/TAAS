@@ -374,8 +374,8 @@ export default function OnboardingPage() {
               </p>
               {templates.length > 0 ? (
                 <div className="space-y-5">
-                  {MODULES.filter(mod => templates.some(t => t.mainCategory === mod.key)).map(mod => {
-                    const modTemplates = templates.filter(t => t.mainCategory === mod.key);
+                  {MODULES.filter(mod => templates.some(t => t.category === mod.key)).map(mod => {
+                    const modTemplates = templates.filter(t => t.category === mod.key);
                     return (
                       <div key={mod.key}>
                         {/* Main category header */}
@@ -386,14 +386,14 @@ export default function OnboardingPage() {
                         </div>
                         {/* Grouped by subcategory */}
                         <div className="space-y-3 ml-1">
-                          {mod.submodules.filter(sub => modTemplates.some(t => t.subCategory === sub.key)).map(sub => (
+                          {mod.submodules.filter(sub => modTemplates.some(t => false)).map(sub => (
                             <div key={sub.key}>
                               <div className="flex items-center gap-1.5 mb-1.5">
                                 <span className="w-1 h-1 rounded-full bg-slate-400 shrink-0" />
                                 <span className="text-xs font-medium text-slate-500">{sub.label}</span>
                               </div>
                               <div className="space-y-1.5 ml-3">
-                                {modTemplates.filter(t => t.subCategory === sub.key).map((t) => {
+                                {modTemplates.filter(t => false).map((t) => {
                                   const version = t.versions?.[0];
                                   return (
                                     <label key={t.id} className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${s.selectedTemplates.includes(t.id) ? "border-primary-300 bg-primary-50" : "border-slate-200 hover:bg-slate-50"}`}>
@@ -410,7 +410,7 @@ export default function OnboardingPage() {
                             </div>
                           ))}
                           {/* Templates without subcategory */}
-                          {modTemplates.filter(t => !t.subCategory || !mod.submodules.some(s => s.key === t.subCategory)).map((t) => {
+                          {modTemplates.filter(t => true).map((t) => {
                             const version = t.versions?.[0];
                             return (
                               <label key={t.id} className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${s.selectedTemplates.includes(t.id) ? "border-primary-300 bg-primary-50" : "border-slate-200 hover:bg-slate-50"}`}>
