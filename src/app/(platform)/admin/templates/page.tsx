@@ -24,7 +24,7 @@ export default function TemplatesPage() {
   const [editVersionId, setEditVersionId] = useState<string | null>(null);
   const [showModulesFor, setShowModulesFor] = useState<string | null>(null);
   const [moduleForm, setModuleForm] = useState<string[]>([]);
-  const [form, setForm] = useState({ name: "", category: "ALG", description: "", isActive: true });
+  const [form, setForm] = useState({ name: "", category: "ALG", description: "", isActive: true, moduleLinks: [] as string[] });
   const [versionForm, setVersionForm] = useState({ version: "v1.0", changelog: "", steps: [{ order: 1, title: "", instruction: "", expectedResult: "" }] });
   const [saving, setSaving] = useState(false);
   const [seeding, setSeeding] = useState(false);
@@ -62,13 +62,23 @@ export default function TemplatesPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(form),
         });
-    if (res.ok) { setShowNew(false); setEditTemplateId(null); setForm({ name: "", category: "ALG", description: "", isActive: true }); load(); }
+    if (res.ok) { setShowNew(false); setEditTemplateId(null); setForm({ name: "", category: "ALG", description: "", isActive: true, moduleLinks: [] }); load(); }
     setSaving(false);
+  }
+
+  function toggleModuleLink(links: string[], key: string): string[] {
+    return links.includes(key) ? links.filter(k => k !== key) : [...links, key];
   }
 
   function openEditTemplate(t: any) {
     setEditTemplateId(t.id);
-    setForm({ name: t.name, category: t.category, description: t.description ?? "", isActive: t.isActive ?? true });
+    setForm({
+      name: t.name,
+      category: t.category ?? "ALG",
+      description: t.description ?? "",
+      isActive: t.isActive ?? true,
+      moduleLinks: (t.moduleLinks ?? []).map((l: any) => l.moduleKey),
+    });
     setShowNew(true);
   }
 
@@ -492,8 +502,8 @@ function TemplateCard({ t, onVersion, onLinks, onCategory }: {
             <span className="text-xs text-slate-400">
               {t.versions?.length ?? 0} versie{t.versions?.length !== 1 ? "s" : ""} · {latestVersion?.changelog ? `${latestVersion.changelog} · ` : ""}Aangemaakt
             </span>
-            {t.moduleLinks.length > 0 ? (
-              <span className="text-xs text-emerald-600">{t.moduleLinks.length} module-koppeling{t.moduleLinks.length !== 1 ? "en" : ""}</span>
+            {(t.moduleLinks?.length ?? 0) > 0 ? (
+              <span className="text-xs text-emerald-600">{t.moduleLinks!.length} module-koppeling{t.moduleLinks!.length !== 1 ? "en" : ""}</span>
             ) : (
               <span className="text-xs text-amber-500">Geen module-koppelingen</span>
             )}
