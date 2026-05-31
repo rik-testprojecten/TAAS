@@ -212,7 +212,7 @@ export default function TemplatesPage() {
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
             {seeding ? "Laden..." : "Standaardtemplates laden"}
           </button>
-          <button onClick={() => { setEditTemplateId(null); setForm({ name: "", category: "ALG", description: "", isActive: true }); setShowNew(true); }} className="btn-primary flex items-center gap-2">
+          <button onClick={() => { setEditTemplateId(null); setForm({ name: "", category: "ALG", description: "", isActive: true, moduleLinks: [] }); setShowNew(true); }} className="btn-primary flex items-center gap-2">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
             Nieuw template
           </button>
@@ -482,6 +482,31 @@ export default function TemplatesPage() {
           </div>
         )}
       </div>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between mt-6">
+          <p className="text-sm text-slate-500">
+            {((page - 1) * PAGE_SIZE) + 1}–{Math.min(page * PAGE_SIZE, total)} van {total} templates
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => goToPage(page - 1)}
+              disabled={page === 1}
+              className="btn-secondary text-sm disabled:opacity-40"
+            >
+              ← Vorige
+            </button>
+            <span className="text-sm text-slate-600">Pagina {page} van {totalPages}</span>
+            <button
+              onClick={() => goToPage(page + 1)}
+              disabled={page === totalPages}
+              className="btn-secondary text-sm disabled:opacity-40"
+            >
+              Volgende →
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -559,31 +584,6 @@ function ModuleLinksEditor({ initialLinks, onSave, onCancel, saving }: {
         <button onClick={() => onSave(links)} disabled={saving} className="btn-primary flex-1">{saving ? "Opslaan..." : "Opslaan"}</button>
         <button onClick={onCancel} className="btn-secondary flex-1">Annuleren</button>
       </div>
-
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between mt-6">
-          <p className="text-sm text-slate-500">
-            {((page - 1) * PAGE_SIZE) + 1}–{Math.min(page * PAGE_SIZE, total)} van {total} templates
-          </p>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => goToPage(page - 1)}
-              disabled={page === 1}
-              className="btn-secondary text-sm disabled:opacity-40"
-            >
-              ← Vorige
-            </button>
-            <span className="text-sm text-slate-600">Pagina {page} van {totalPages}</span>
-            <button
-              onClick={() => goToPage(page + 1)}
-              disabled={page === totalPages}
-              className="btn-secondary text-sm disabled:opacity-40"
-            >
-              Volgende →
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

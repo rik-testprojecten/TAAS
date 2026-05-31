@@ -5,7 +5,7 @@ import Link from "next/link";
 import { STATUS_COLORS, PHASE_DESCRIPTIONS, PHASE_STATUS_LABELS, RUN_STATUS_LABELS, formatDate, todayISO, daysFromNowISO } from "@/lib/utils";
 import { Tabs } from "@/components/Tabs";
 import { useToast } from "@/components/Toast";
-import { MODULES, getSubmoduleLabel } from "@/lib/modules";
+import { MODULES, getModuleLabel, getSubmoduleLabel } from "@/lib/modules";
 
 // Keuzelijst voor het subonderdeel waaraan een flow gekoppeld wordt.
 function SubmoduleSelect({ value, onChange, allowed }: { value: string; onChange: (v: string) => void; allowed?: string[] }) {
