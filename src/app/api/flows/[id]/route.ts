@@ -37,6 +37,7 @@ const patchSchema = z.object({
   name: z.string().min(1).max(200).optional(),
   description: z.string().max(2000).nullable().optional(),
   status: z.enum(["ACTIVE", "CLOSED"]).optional(),
+  moduleKey: z.string().nullable().optional(),
   scheduledStart: z.string().nullable().optional(),
   scheduledEnd: z.string().nullable().optional(),
 });
@@ -70,6 +71,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (parsed.data.name !== undefined) data.name = parsed.data.name;
   if (parsed.data.description !== undefined) data.description = parsed.data.description;
   if (parsed.data.status !== undefined) data.status = parsed.data.status;
+  if (parsed.data.moduleKey !== undefined) data.moduleKey = parsed.data.moduleKey;
   if (parsed.data.scheduledStart !== undefined) data.scheduledStart = parsed.data.scheduledStart ? new Date(parsed.data.scheduledStart) : null;
   if (parsed.data.scheduledEnd !== undefined) data.scheduledEnd = parsed.data.scheduledEnd ? new Date(parsed.data.scheduledEnd) : null;
 

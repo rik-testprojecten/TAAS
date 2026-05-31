@@ -92,7 +92,10 @@ export default function OnboardingPage() {
 
   useEffect(() => {
     if (step === 5) {
-      const params = s.selectedModules.map((m) => `module=${m}`).join("&");
+      // Filter op de gekozen subonderdelen (en modules als fallback), zodat
+      // alleen template flows van de gekozen modules worden aangeboden.
+      const keys = [...s.selectedSubmodules, ...s.selectedModules];
+      const params = keys.map((k) => `key=${encodeURIComponent(k)}`).join("&");
       fetch(`/api/templates${params ? `?${params}` : ""}`)
         .then((r) => r.json())
         .then((d) => setTemplates(Array.isArray(d) ? d : []));
@@ -477,6 +480,12 @@ export default function OnboardingPage() {
                 <SummaryRow
                   label="Testfases"
                   value={s.createPhases && s.selectedPhases.length > 0 ? s.selectedPhases.join(", ") : "Niet ingesteld"}
+                />
+                <SummaryRow
+                  label="Template flows"
+                  value={s.selectedTemplates.length === 0
+                    ? "Geen (zelf flows opbouwen)"
+                    : `${s.selectedTemplates.length} template${s.selectedTemplates.length !== 1 ? "s" : ""} inlezen`}
                 />
                 <SummaryRow
                   label="Go-live datum"

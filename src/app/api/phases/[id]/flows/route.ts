@@ -6,6 +6,7 @@ import { z } from "zod";
 const createSchema = z.object({
   name: z.string().min(2),
   description: z.string().optional(),
+  moduleKey: z.string().nullable().optional(),
 });
 
 export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {

@@ -8,6 +8,7 @@ const schema = z.object({
   name: z.string().min(2),
   includeIssues: z.boolean().default(false),
   issueStatuses: z.array(z.string()).default([]),
+  moduleKey: z.string().nullable().optional(),
 });
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -25,15 +26,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const sourceVersion = await prisma.flowVersion.findFirst({
     where: { id: parsed.data.sourceFlowVersionId, tenantId },
-    include: { steps: { orderBy: { order: "asc" } } },
+    include: { steps: { orderBy: { order: "asc" } }, flow: { select: { moduleKey: true } } },
   });
   if (!sourceVersion) return NextResponse.json({ error: "Source version not found" }, { status: 404 });
+
+  // Subonderdeel overnemen van de bronflow, tenzij expliciet meegegeven.
+  const moduleKey =
+    parsed.data.moduleKey !== undefined ? parsed.data.moduleKey : sourceVersion.flow.moduleKey ?? null;
 
   const flow = await prisma.flow.create({
     data: {
       name: parsed.data.name,
       phaseId: id,
       tenantId,
+      moduleKey,
       sourceFlowVersionId: sourceVersion.id,
       versions: {
         create: {

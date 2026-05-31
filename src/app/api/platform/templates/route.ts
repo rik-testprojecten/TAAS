@@ -5,9 +5,9 @@ import { z } from "zod";
 
 const createSchema = z.object({
   name: z.string().min(2),
-  mainCategoryId: z.string().optional(),
-  subCategoryId: z.string().optional(),
+  category: z.string().optional(),
   description: z.string().optional(),
+  isActive: z.boolean().optional(),
 });
 
 export async function GET(req: NextRequest) {
@@ -23,8 +23,7 @@ export async function GET(req: NextRequest) {
     prisma.template.findMany({
       include: {
         versions: { orderBy: { createdAt: "desc" }, take: 1 },
-        mainCategory: { select: { id: true, name: true, slug: true } },
-        subCategory: { select: { id: true, name: true, slug: true } },
+        moduleLinks: { select: { moduleKey: true } },
       },
       orderBy: { name: "asc" },
       skip,

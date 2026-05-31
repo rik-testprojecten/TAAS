@@ -34,7 +34,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { tenantId, user } = result.context;
   const { id } = await params;
 
-  const step = await prisma.runStep.findFirst({ where: { id, tenantId } });
+  const step = await prisma.runStep.findFirst({
+    where: { id, tenantId },
+    include: { run: { include: { flowVersion: { include: { flow: { select: { moduleKey: true } } } } } } },
+  });
   if (!step) return NextResponse.json({ error: "Step not found" }, { status: 404 });
 
   const body = await req.json();
@@ -42,8 +45,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const parsed = createSchema.safeParse(rest);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
+  // Koppel de bevinding aan het subonderdeel van de flow waaruit ze voortkomt.
+  const moduleKey = step.run.flowVersion.flow.moduleKey ?? null;
+
   const issue = await prisma.issue.create({
-    data: { ...parsed.data, runStepId: id, tenantId, createdById: user.id },
+    data: { ...parsed.data, runStepId: id, tenantId, moduleKey, createdById: user.id },
     include: { createdBy: { select: { id: true, name: true } } },
   });
 
